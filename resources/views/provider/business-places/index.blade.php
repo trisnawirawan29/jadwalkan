@@ -1,0 +1,19 @@
+@extends('layouts.admin')
+
+@section('title', 'Tempat Bisnis')
+@section('page-title', 'Tempat Bisnis')
+@section('page-subtitle', 'Kelola lokasi olahraga dan layanan yang tersedia.')
+
+@section('content')
+    <div class="content-card">
+        @if (session('success'))<div class="alert alert-success small">{{ session('success') }}</div>@endif
+        <div class="card-heading"><div><h5>Tempat bisnis saya</h5><p>{{ $businessPlaces->count() }} tempat bisnis terdaftar.</p></div><a href="{{ route('provider.business-places.create') }}" class="btn btn-primary"><i class="fas fa-plus me-1"></i>Tambah tempat</a></div>
+        <div class="row g-4">
+            @forelse ($businessPlaces as $businessPlace)
+                <div class="col-12 col-lg-6"><div class="business-place-list-card h-100">@if ($businessPlace->cover_image_url)<img class="business-place-list-cover" src="{{ $businessPlace->cover_image_url }}" alt="{{ $businessPlace->name }}">@else<div class="business-place-list-cover business-place-list-placeholder"><i class="fas fa-building"></i></div>@endif<div class="p-4"><div class="d-flex justify-content-between gap-3"><div><h5 class="mb-1">{{ $businessPlace->name }}</h5><p class="text-muted small mb-1">{{ $businessPlace->address ?: 'Alamat belum diisi' }}</p><p class="text-muted small mb-2"><i class="fas fa-map-marker-alt me-1 text-primary"></i>{{ $businessPlace->district_name ?: 'Kecamatan belum dipilih' }}{{ $businessPlace->regency_name ? ', '.$businessPlace->regency_name : '' }}{{ $businessPlace->province_name ? ', '.$businessPlace->province_name : '' }}</p></div><form method="POST" action="{{ route('provider.business-places.status', $businessPlace) }}" class="business-place-status-toggle">@csrf @method('PATCH')<button type="submit" class="business-place-toggle {{ $businessPlace->is_active ? 'is-active' : '' }}" aria-pressed="{{ $businessPlace->is_active ? 'true' : 'false' }}" title="{{ $businessPlace->is_active ? 'Nonaktifkan tempat bisnis' : 'Aktifkan tempat bisnis' }}"><span class="business-place-toggle-dot"></span><span>{{ $businessPlace->is_active ? 'Aktif' : 'Nonaktif' }}</span></button></form></div><p class="small text-muted">{{ $businessPlace->description ?: 'Belum ada deskripsi tempat bisnis.' }}</p><div class="d-flex justify-content-between align-items-center mt-3"><span class="small"><i class="fas fa-layer-group me-1 text-primary"></i>{{ $businessPlace->services_count }} layanan / lapangan</span><div class="d-flex gap-2"><a href="{{ route('provider.business-places.services.index', $businessPlace) }}" class="btn btn-sm btn-primary">Kelola layanan</a>@if ($businessPlace->google_maps_url)<a href="{{ $businessPlace->google_maps_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-light"><i class="fas fa-map-location-dot me-1"></i>Maps</a>@endif<a href="{{ route('provider.business-places.edit', $businessPlace) }}" class="btn btn-sm btn-light"><i class="fas fa-pen"></i></a><form method="POST" action="{{ route('provider.business-places.destroy', $businessPlace) }}" data-confirm="Hapus tempat bisnis beserta seluruh layanan dan jadwalnya?">@csrf @method('DELETE')<button class="btn btn-sm btn-light text-danger"><i class="fas fa-trash"></i></button></form></div></div></div></div>
+            @empty
+                <div class="col-12"><div class="text-center text-muted py-5"><i class="fas fa-building fa-2x mb-3"></i><p>Belum ada tempat bisnis.</p><a href="{{ route('provider.business-places.create') }}" class="btn btn-primary">Buat tempat bisnis pertama</a></div></div>
+            @endforelse
+        </div>
+    </div>
+@endsection

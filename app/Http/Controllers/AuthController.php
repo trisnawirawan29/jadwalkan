@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\View\View;
 
@@ -39,6 +40,7 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', PasswordRule::min(8)],
+            'role' => ['nullable', Rule::in(['user', 'provider'])],
         ], [
             'name.required' => 'Nama wajib diisi.',
             'email.unique' => 'Email tersebut sudah terdaftar.',

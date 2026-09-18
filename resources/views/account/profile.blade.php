@@ -10,7 +10,7 @@
 
     <div class="cv-header content-card mb-4">
         <div class="profile-avatar cv-avatar">
-            @if (auth()->user()->avatar)<img src="{{ asset('storage/'.auth()->user()->avatar) }}" alt="Avatar">@else{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}@endif
+            @if (auth()->user()->avatar_url)<img src="{{ auth()->user()->avatar_url }}" alt="Avatar">@else{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}@endif
         </div>
         <div class="cv-intro"><p class="eyebrow mb-2">PROFIL PROFESIONAL</p><h2>{{ auth()->user()->name }}</h2><p class="cv-role">{{ auth()->user()->job_title ?: ucfirst(auth()->user()->role) }}</p><p class="cv-bio">{{ auth()->user()->bio ?: 'Tambahkan ringkasan singkat tentang diri Anda untuk melengkapi profil.' }}</p><div class="cv-meta"><span><i class="fas fa-location-dot"></i>{{ auth()->user()->location ?: 'Lokasi belum diisi' }}</span><span><i class="fas fa-envelope"></i>{{ auth()->user()->email }}</span><span><i class="fas fa-phone"></i>{{ auth()->user()->phone ?: 'Telepon belum diisi' }}</span></div></div>
         <div class="cv-actions"><form method="POST" action="{{ route('profile.avatar') }}" enctype="multipart/form-data"><input type="file" name="avatar" id="avatar" class="d-none" accept="image/*" required><label for="avatar" class="btn btn-light btn-sm"><i class="fas fa-camera me-1"></i> Ganti avatar</label><button class="d-none" id="avatar-submit"></button></form></div>

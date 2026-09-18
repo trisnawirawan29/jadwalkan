@@ -9,8 +9,10 @@ use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 
 #[Fillable(['name', 'email', 'password', 'avatar', 'role', 'job_title', 'phone', 'location', 'birth_date', 'website', 'bio', 'google_id'])]
 #[Hidden(['password', 'remember_token'])]
@@ -27,6 +29,25 @@ class User extends Authenticatable implements CanResetPassword
     public function isAdmin(): bool
     {
         return $this->hasRole('admin');
+    }
+
+    public function isProvider(): bool
+    {
+        return $this->hasRole('provider');
+    }
+
+    public function businessPlaces(): HasMany
+    {
+        return $this->hasMany(BusinessPlace::class, 'provider_id');
+    }
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if (! $this->avatar || ! Storage::disk('public')->exists($this->avatar)) {
+            return null;
+        }
+
+        return Storage::disk('public')->url($this->avatar);
     }
 
     /**

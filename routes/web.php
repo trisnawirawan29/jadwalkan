@@ -1,12 +1,20 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AdminBusinessCategoryController;
 use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GoogleAuthController;
+use App\Http\Controllers\IndonesiaRegionController;
+use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProviderBusinessPlaceController;
+use App\Http\Controllers\ProviderMapController;
+use App\Http\Controllers\ProviderScheduleController;
+use App\Http\Controllers\ProviderServiceClosureController;
+use App\Http\Controllers\ProviderServiceController;
 use App\Http\Controllers\SettingController;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +32,7 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
 Route::middleware('auth')->group(function () {
+    Route::post('/language', [LanguageController::class, 'update'])->name('language.update');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications');
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
@@ -45,8 +54,20 @@ Route::middleware('auth')->group(function () {
         Route::put('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
         Route::put('/users/{user}/role', [AdminUserController::class, 'updateRole'])->name('users.role');
         Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');
+        Route::resource('business-categories', AdminBusinessCategoryController::class)->except(['show'])->parameters(['business-categories' => 'businessCategory']);
         Route::get('/settings', [SettingController::class, 'edit'])->name('settings');
         Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs');
+    });
+
+    Route::middleware('role:provider')->prefix('provider')->name('provider.')->group(function () {
+        Route::get('regions/{level}/{code?}', IndonesiaRegionController::class)->name('regions');
+        Route::get('map/geocode', [ProviderMapController::class, 'geocode'])->name('map.geocode');
+        Route::patch('business-places/{businessPlace}/status', [ProviderBusinessPlaceController::class, 'toggleStatus'])->name('business-places.status');
+        Route::resource('business-places', ProviderBusinessPlaceController::class);
+        Route::resource('business-places.services', ProviderServiceController::class)->parameters(['services' => 'businessService']);
+        Route::post('business-places/{businessPlace}/services/{businessService}/closures', [ProviderServiceClosureController::class, 'store'])->name('business-places.services.closures.store');
+        Route::delete('business-places/{businessPlace}/services/{businessService}/closures/{serviceClosure}', [ProviderServiceClosureController::class, 'destroy'])->name('business-places.services.closures.destroy');
+        Route::resource('business-places.services.schedules', ProviderScheduleController::class)->parameters(['services' => 'businessService']);
     });
 });

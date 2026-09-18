@@ -56,7 +56,7 @@ class AdminUserController extends Controller
 
     public function updateRole(Request $request, User $user): RedirectResponse
     {
-        $data = $request->validate(['role' => ['required', Rule::in(['admin', 'manager', 'user'])]]);
+        $data = $request->validate(['role' => ['required', Rule::in(['admin', 'manager', 'provider', 'user'])]]);
 
         if ($user->is(auth()->user()) && $data['role'] !== 'admin') {
             return back()->withErrors(['role' => 'Anda tidak dapat menghapus role admin dari akun sendiri.']);
@@ -90,7 +90,7 @@ class AdminUserController extends Controller
         return [
             'name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user?->id)],
-            'role' => ['required', Rule::in(['admin', 'manager', 'user'])],
+            'role' => ['required', Rule::in(['admin', 'manager', 'provider', 'user'])],
             'password' => [$user ? 'nullable' : 'required', 'confirmed', Password::min(8)],
         ];
     }
