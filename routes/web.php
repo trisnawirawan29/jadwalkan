@@ -17,6 +17,7 @@ use App\Http\Controllers\PlaceDirectoryController;
 use App\Http\Controllers\ProviderApplicationController;
 use App\Http\Controllers\ProviderBookingController;
 use App\Http\Controllers\ProviderBusinessPlaceController;
+use App\Http\Controllers\ProviderFinancialReportController;
 use App\Http\Controllers\ProviderMapController;
 use App\Http\Controllers\ProviderScheduleController;
 use App\Http\Controllers\ProviderServiceClosureController;
@@ -94,6 +95,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('role:provider')->prefix('provider')->name('provider.')->group(function (): void {
+        Route::get('reports/financial', [ProviderFinancialReportController::class, 'index'])->name('reports.financial');
         Route::get('staff', [ProviderStaffController::class, 'index'])->name('staff.index');
         Route::post('staff', [ProviderStaffController::class, 'store'])->name('staff.store');
         Route::delete('staff/{staff}', [ProviderStaffController::class, 'destroy'])->name('staff.destroy');

@@ -60,6 +60,7 @@
                 @endif
                 @if (auth()->user()->isProvider())
                     <li class="nav-item"><a href="{{ route('provider.business-places.index') }}" class="nav-link {{ request()->routeIs('provider.business-places*') ? 'active' : '' }}"><i class="nav-icon fas fa-building"></i><p>{{ __('Business Places') }}</p></a></li>
+                    <li class="nav-item"><a href="{{ route('provider.reports.financial') }}" class="nav-link {{ request()->routeIs('provider.reports.financial') ? 'active' : '' }}"><i class="nav-icon fas fa-chart-line"></i><p>{{ __('Laporan keuangan') }}</p></a></li>
                     <li class="nav-item"><a href="{{ route('provider.staff.index') }}" class="nav-link {{ request()->routeIs('provider.staff*') ? 'active' : '' }}"><i class="nav-icon fas fa-user-shield"></i><p>Pegawai provider</p></a></li>
                 @endif
                 @if (auth()->user()->isProvider() || auth()->user()->isProviderStaff())
