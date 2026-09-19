@@ -9,6 +9,7 @@
             <a href="{{ route('landing') }}" class="transition hover:text-white {{ $activePage === 'home' ? 'text-white' : '' }}">{{ __('Beranda') }}</a>
             <a href="{{ route('places.index') }}" class="transition hover:text-white {{ $activePage === 'places' ? 'text-white' : '' }}">{{ __('Jelajahi') }}</a>
             <a href="{{ route('landing') }}#sebaran" class="transition hover:text-white">{{ __('Sebaran tempat') }}</a>
+            <a href="{{ route('user-manual') }}" class="transition hover:text-white {{ $activePage === 'manual' ? 'text-white' : '' }}">{{ __('Panduan') }}</a>
         </nav>
         <div class="flex items-center gap-2">
             <div class="relative group">

@@ -29,10 +29,12 @@ use App\Http\Controllers\ProviderServiceController;
 use App\Http\Controllers\ProviderStaffController;
 use App\Http\Controllers\PublicPlaceController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\UserManualController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', LandingPageController::class)->name('landing');
 Route::get('/places', PlaceDirectoryController::class)->name('places.index');
+Route::get('/user-manual', UserManualController::class)->name('user-manual');
 Route::get('/places/{businessPlace}', [PublicPlaceController::class, 'show'])->name('places.show');
 Route::post('/language', [LanguageController::class, 'update'])->name('language.update');
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
