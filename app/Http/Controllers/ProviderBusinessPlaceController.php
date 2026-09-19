@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BusinessCategory;
 use App\Models\BusinessPlace;
+use App\Services\ProviderPlanLimitService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -15,21 +16,29 @@ class ProviderBusinessPlaceController extends Controller
     public function index(Request $request): View
     {
         $this->authorize('viewAny', BusinessPlace::class);
+        app(ProviderPlanLimitService::class)->deactivateExpiredBusinesses($request->user());
         $businessPlaces = BusinessPlace::query()->whereBelongsTo($request->user(), 'provider')->with(['businessCategories.parent'])->withCount('services')->latest()->get();
 
         return view('provider.business-places.index', compact('businessPlaces'));
     }
 
-    public function create(): View
+    public function create(Request $request, ProviderPlanLimitService $planLimits): View|RedirectResponse
     {
         $this->authorize('create', BusinessPlace::class);
+
+        if ($message = $planLimits->businessCreationLimitMessage($request->user())) {
+            return redirect()->route('provider.business-places.index')
+                ->with('warning', $message)
+                ->with('show_plan_upgrade', true);
+        }
 
         return view('provider.business-places.form', ['businessPlace' => new BusinessPlace, 'categories' => $this->categories()]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, ProviderPlanLimitService $planLimits): RedirectResponse
     {
         $this->authorize('create', BusinessPlace::class);
+        $planLimits->ensureCanCreateBusiness($request->user());
         $data = $request->validate($this->rules());
         $data['cover_image'] = $request->file('cover_image')?->store('business-places', 'public');
         $categoryIds = $data['business_category_ids'] ?? (isset($data['business_category_id']) ? [$data['business_category_id']] : []);

@@ -7,6 +7,7 @@
 @section('content')
     <div class="content-card">
         @if (session('success'))<div class="alert alert-success small">{{ session('success') }}</div>@endif
+        @if (session('warning'))<div class="plan-limit-warning"><span class="plan-limit-warning-icon"><i class="fas fa-lock"></i></span><div><strong>{{ __('Kuota bisnis paket Anda sudah penuh') }}</strong><p>{{ session('warning') }}</p></div><a href="{{ route('provider.plans.index') }}" class="btn btn-warning btn-sm ms-auto"><i class="fas fa-arrow-up me-1"></i>{{ __('Upgrade paket') }}</a></div>@endif
         <div class="card-heading"><div><h5>Tempat bisnis saya</h5><p>{{ $businessPlaces->count() }} tempat bisnis terdaftar.</p></div><a href="{{ route('provider.business-places.create') }}" class="btn btn-primary"><i class="fas fa-plus me-1"></i>Tambah tempat</a></div>
         <div class="row g-4">
             @forelse ($businessPlaces as $businessPlace)

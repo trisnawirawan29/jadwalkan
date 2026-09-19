@@ -7,6 +7,7 @@ use App\Support\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class SettingController extends Controller
@@ -44,11 +45,15 @@ class SettingController extends Controller
             'google_client_secret' => ['nullable', 'string', 'max:500'],
             'google_api_key' => ['nullable', 'string', 'max:500'],
             'google_redirect_uri' => ['nullable', 'url', 'max:500'],
+            'provider_plan_bank_name' => ['nullable', 'string', 'max:100'],
+            'provider_plan_bank_account_name' => ['nullable', 'string', 'max:150'],
+            'provider_plan_bank_account_number' => ['nullable', 'string', 'max:50'],
+            'provider_plan_qris_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
         $changedKeys = array_keys($data);
         foreach ($data as $key => $value) {
-            if (in_array($key, ['google_client_secret', 'google_api_key'], true)) {
+            if (in_array($key, ['google_client_secret', 'google_api_key', 'provider_plan_qris_image'], true)) {
                 continue;
             }
             Setting::updateOrCreate(['key' => $key], ['value' => $value]);
@@ -56,6 +61,15 @@ class SettingController extends Controller
         foreach (['google_client_secret', 'google_api_key'] as $secret) {
             if (filled($data[$secret] ?? null)) {
                 Setting::updateOrCreate(['key' => $secret], ['value' => Crypt::encryptString($data[$secret])]);
+            }
+        }
+        if ($request->hasFile('provider_plan_qris_image')) {
+            $previousPath = Setting::query()->where('key', 'provider_plan_qris_image')->value('value');
+            $qrisPath = $request->file('provider_plan_qris_image')->store('provider-plan-payment', 'public');
+            Setting::updateOrCreate(['key' => 'provider_plan_qris_image'], ['value' => $qrisPath]);
+
+            if ($previousPath) {
+                Storage::disk('public')->delete($previousPath);
             }
         }
         AuditLogger::record('settings.updated', 'Pengaturan aplikasi diperbarui.', null, [], ['keys' => $changedKeys]);

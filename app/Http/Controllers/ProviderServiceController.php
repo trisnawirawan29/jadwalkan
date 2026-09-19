@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BusinessCategory;
 use App\Models\BusinessPlace;
 use App\Models\BusinessService;
+use App\Services\ProviderPlanLimitService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -37,10 +38,11 @@ class ProviderServiceController extends Controller
         return view('provider.services.form', ['businessPlace' => $businessPlace, 'businessService' => new BusinessService, 'categories' => $this->categories()]);
     }
 
-    public function store(Request $request, BusinessPlace $businessPlace): RedirectResponse
+    public function store(Request $request, BusinessPlace $businessPlace, ProviderPlanLimitService $planLimits): RedirectResponse
     {
         $this->authorize('view', $businessPlace);
         $this->authorize('create', BusinessService::class);
+        $planLimits->ensureCanCreateService($businessPlace);
         $data = $request->validate($this->rules());
         $hourlyPrices = $this->normalizeHourlyPrices($data['hourly_prices'] ?? []);
         unset($data['hourly_prices']);

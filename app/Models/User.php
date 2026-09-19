@@ -15,7 +15,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['name', 'email', 'password', 'avatar', 'role', 'provider_id', 'job_title', 'phone', 'location', 'province_code', 'province_name', 'regency_code', 'regency_name', 'district_code', 'district_name', 'birth_date', 'website', 'bio', 'payment_bank_name', 'payment_bank_account_name', 'payment_bank_account_number', 'payment_qris_image', 'google_id'])]
+#[Fillable(['name', 'email', 'password', 'avatar', 'role', 'provider_id', 'provider_plan_id', 'provider_plan_started_at', 'provider_plan_expires_at', 'job_title', 'phone', 'location', 'province_code', 'province_name', 'regency_code', 'regency_name', 'district_code', 'district_name', 'birth_date', 'website', 'bio', 'payment_bank_name', 'payment_bank_account_name', 'payment_bank_account_number', 'payment_qris_image', 'google_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements CanResetPassword
 {
@@ -45,6 +45,16 @@ class User extends Authenticatable implements CanResetPassword
     public function provider(): BelongsTo
     {
         return $this->belongsTo(self::class, 'provider_id');
+    }
+
+    public function providerPlan(): BelongsTo
+    {
+        return $this->belongsTo(ProviderPlan::class);
+    }
+
+    public function planUpgradeRequests(): HasMany
+    {
+        return $this->hasMany(ProviderPlanUpgrade::class, 'provider_id');
     }
 
     public function staffMembers(): HasMany
@@ -101,6 +111,9 @@ class User extends Authenticatable implements CanResetPassword
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'provider_id' => 'integer',
+            'provider_plan_id' => 'integer',
+            'provider_plan_started_at' => 'datetime',
+            'provider_plan_expires_at' => 'datetime',
         ];
     }
 }

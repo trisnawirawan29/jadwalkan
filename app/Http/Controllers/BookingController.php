@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\BusinessPlace;
 use App\Models\ServiceSchedule;
+use App\Services\ProviderPlanLimitService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -91,7 +92,7 @@ class BookingController extends Controller
         return view('bookings.index', compact('bookings', 'filters', 'view', 'display', 'calendarMonth', 'calendarDays', 'calendarBookings', 'calendarBookingsByDate'));
     }
 
-    public function store(Request $request, BusinessPlace $businessPlace): RedirectResponse
+    public function store(Request $request, BusinessPlace $businessPlace, ProviderPlanLimitService $planLimits): RedirectResponse
     {
         abort_unless($businessPlace->is_active, 404);
 
@@ -114,6 +115,7 @@ class BookingController extends Controller
             ->firstOrFail();
 
         $bookingDate = Carbon::createFromFormat('Y-m-d', $data['booking_date']);
+        $planLimits->ensureCanAcceptBooking($businessPlace, $bookingDate);
         if ((int) $bookingDate->isoWeekday() !== $schedule->day_of_week) {
             throw ValidationException::withMessages(['booking_date' => 'Tanggal tidak sesuai dengan hari pada jadwal yang dipilih.']);
         }

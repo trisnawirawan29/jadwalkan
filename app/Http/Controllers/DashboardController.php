@@ -2,10 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Booking;
 use App\Models\BusinessPlace;
 use App\Models\BusinessService;
+use App\Models\ProviderApplication;
+use App\Models\ProviderPlan;
+use App\Models\ProviderPlanUpgrade;
 use App\Models\ServiceClosure;
 use App\Models\ServiceSchedule;
+use App\Models\User;
+use App\Services\ProviderPlanLimitService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -19,6 +25,8 @@ class DashboardController extends Controller
 
         if (auth()->user()->isProvider()) {
             $provider = auth()->user();
+            app(ProviderPlanLimitService::class)->deactivateExpiredBusinesses($provider);
+            $provider->refresh();
             $placeScope = fn ($query) => $query->where('provider_id', $provider->id);
             $businessPlaces = BusinessPlace::query()
                 ->where('provider_id', $provider->id)
@@ -88,6 +96,65 @@ class DashboardController extends Controller
                 'upcomingBookingCount' => $upcomingBookingCount,
                 'bookingCount' => $user->bookings()->count(),
                 'profileCompletion' => collect([$user->name, $user->email, $user->phone, $user->location, $user->avatar])->filter()->count() * 20,
+            ]);
+        }
+
+        if (auth()->user()->isAdmin()) {
+            $monthStart = now()->startOfMonth();
+            $monthEnd = now()->endOfMonth();
+            $chartStart = now()->subMonths(5)->startOfMonth();
+            $monthLabels = [];
+            $bookingTrend = [];
+            $upgradeTrend = [];
+
+            for ($month = $chartStart->copy(); $month <= $monthEnd; $month->addMonth()) {
+                $monthLabels[] = $month->translatedFormat('M Y');
+                $bookingTrend[] = Booking::query()->whereBetween('created_at', [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()])->count();
+                $upgradeTrend[] = ProviderPlanUpgrade::query()->where('status', 'approved')->whereBetween('reviewed_at', [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()])->count();
+            }
+
+            $bookingStatuses = Booking::query()
+                ->selectRaw('status, COUNT(*) as total')
+                ->groupBy('status')
+                ->pluck('total', 'status');
+            $recentUpgrades = ProviderPlanUpgrade::query()
+                ->with(['provider', 'providerPlan'])
+                ->latest()
+                ->limit(5)
+                ->get();
+            $providerTotal = User::query()->where('role', 'provider')->count();
+            $planDistribution = ProviderPlan::query()
+                ->withCount(['providers' => fn ($query) => $query->where('role', 'provider')])
+                ->orderByDesc('providers_count')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (ProviderPlan $plan): array => [
+                    'name' => $plan->name,
+                    'count' => $plan->providers_count,
+                    'percentage' => $providerTotal > 0 ? round(($plan->providers_count / $providerTotal) * 100) : 0,
+                    'is_active' => $plan->is_active,
+                ]);
+            $unassignedProviders = User::query()->where('role', 'provider')->whereNull('provider_plan_id')->count();
+
+            return view('dashboard.admin', [
+                'stats' => [
+                    ['label' => 'Total pengguna', 'value' => User::query()->count(), 'icon' => 'fas fa-users', 'color' => 'primary', 'note' => 'Semua akun terdaftar'],
+                    ['label' => 'Provider aktif', 'value' => User::query()->where('role', 'provider')->count(), 'icon' => 'fas fa-store', 'color' => 'success', 'note' => 'Pemilik bisnis terdaftar'],
+                    ['label' => 'Tempat bisnis', 'value' => BusinessPlace::query()->count(), 'icon' => 'fas fa-building', 'color' => 'warning', 'note' => 'Lokasi di aplikasi'],
+                    ['label' => 'Booking bulan ini', 'value' => Booking::query()->whereBetween('created_at', [$monthStart, $monthEnd])->count(), 'icon' => 'fas fa-calendar-check', 'color' => 'danger', 'note' => 'Aktivitas bulan berjalan'],
+                ],
+                'monthLabels' => $monthLabels,
+                'bookingTrend' => $bookingTrend,
+                'upgradeTrend' => $upgradeTrend,
+                'bookingStatuses' => $bookingStatuses,
+                'recentUpgrades' => $recentUpgrades,
+                'planDistribution' => $planDistribution,
+                'providerTotal' => $providerTotal,
+                'unassignedProviders' => $unassignedProviders,
+                'pendingApplications' => ProviderApplication::query()->where('status', 'pending')->count(),
+                'pendingUpgrades' => ProviderPlanUpgrade::query()->where('status', 'pending')->count(),
+                'confirmedRevenue' => Booking::query()->where('status', 'confirmed')->whereBetween('created_at', [$monthStart, $monthEnd])->sum('total_cost'),
+                'approvedUpgradeRevenue' => ProviderPlanUpgrade::query()->where('status', 'approved')->whereBetween('reviewed_at', [$monthStart, $monthEnd])->sum('amount'),
             ]);
         }
 

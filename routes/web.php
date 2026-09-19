@@ -3,6 +3,9 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminBusinessCategoryController;
 use App\Http\Controllers\AdminProviderApplicationController;
+use App\Http\Controllers\AdminProviderPlanController;
+use App\Http\Controllers\AdminProviderPlanUpgradeController;
+use App\Http\Controllers\AdminUpgradeFinancialReportController;
 use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
@@ -19,6 +22,7 @@ use App\Http\Controllers\ProviderBookingController;
 use App\Http\Controllers\ProviderBusinessPlaceController;
 use App\Http\Controllers\ProviderFinancialReportController;
 use App\Http\Controllers\ProviderMapController;
+use App\Http\Controllers\ProviderPlanController;
 use App\Http\Controllers\ProviderScheduleController;
 use App\Http\Controllers\ProviderServiceClosureController;
 use App\Http\Controllers\ProviderServiceController;
@@ -76,9 +80,16 @@ Route::middleware('auth')->group(function () {
         Route::put('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
         Route::put('/users/{user}/role', [AdminUserController::class, 'updateRole'])->name('users.role');
         Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');
+        Route::patch('/users/{user}/revoke-provider-plan', [AdminUserController::class, 'revokeProviderPlan'])->name('users.revoke-provider-plan');
         Route::get('/provider-applications', [AdminProviderApplicationController::class, 'index'])->name('provider-applications.index');
         Route::patch('/provider-applications/{providerApplication}/approve', [AdminProviderApplicationController::class, 'approve'])->name('provider-applications.approve');
         Route::patch('/provider-applications/{providerApplication}/reject', [AdminProviderApplicationController::class, 'reject'])->name('provider-applications.reject');
+        Route::resource('provider-plans', AdminProviderPlanController::class)->except(['show'])->parameters(['provider-plans' => 'providerPlan']);
+        Route::patch('/provider-plans/{providerPlan}/toggle-status', [AdminProviderPlanController::class, 'toggleStatus'])->name('provider-plans.toggle-status');
+        Route::get('/provider-plan-upgrades', [AdminProviderPlanUpgradeController::class, 'index'])->name('provider-plan-upgrades.index');
+        Route::get('/reports/upgrade-financial', [AdminUpgradeFinancialReportController::class, 'index'])->name('reports.upgrade-financial');
+        Route::patch('/provider-plan-upgrades/{providerPlanUpgrade}/approve', [AdminProviderPlanUpgradeController::class, 'approve'])->name('provider-plan-upgrades.approve');
+        Route::patch('/provider-plan-upgrades/{providerPlanUpgrade}/reject', [AdminProviderPlanUpgradeController::class, 'reject'])->name('provider-plan-upgrades.reject');
         Route::resource('business-categories', AdminBusinessCategoryController::class)->except(['show'])->parameters(['business-categories' => 'businessCategory']);
         Route::get('/settings', [SettingController::class, 'edit'])->name('settings');
         Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
@@ -95,6 +106,8 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('role:provider')->prefix('provider')->name('provider.')->group(function (): void {
+        Route::get('plans', [ProviderPlanController::class, 'index'])->name('plans.index');
+        Route::post('plans/{providerPlan}/upgrade', [ProviderPlanController::class, 'store'])->name('plans.upgrade');
         Route::get('reports/financial', [ProviderFinancialReportController::class, 'index'])->name('reports.financial');
         Route::get('staff', [ProviderStaffController::class, 'index'])->name('staff.index');
         Route::post('staff', [ProviderStaffController::class, 'store'])->name('staff.store');

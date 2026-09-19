@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ProviderApplication;
+use App\Models\ProviderPlan;
 use App\Support\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,7 +30,12 @@ class AdminProviderApplicationController extends Controller
         }
 
         DB::transaction(function () use ($providerApplication, $request): void {
-            $providerApplication->user()->update(['role' => 'provider']);
+            $providerApplication->user()->update([
+                'role' => 'provider',
+                'provider_plan_id' => ProviderPlan::query()->where('is_free', true)->value('id'),
+                'provider_plan_started_at' => now(),
+                'provider_plan_expires_at' => null,
+            ]);
             $providerApplication->update([
                 'status' => 'approved',
                 'reviewed_by' => $request->user()->id,
