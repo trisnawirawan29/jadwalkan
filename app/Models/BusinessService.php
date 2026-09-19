@@ -9,14 +9,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['business_place_id', 'business_category_id', 'name', 'type', 'description', 'cover_image', 'is_active'])]
+#[Fillable(['business_place_id', 'business_category_id', 'name', 'type', 'description', 'price_per_hour', 'hourly_prices', 'cover_image', 'is_active'])]
 class BusinessService extends Model
 {
     use HasFactory;
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return ['is_active' => 'boolean', 'price_per_hour' => 'decimal:2', 'hourly_prices' => 'array'];
     }
 
     public function getCoverImageUrlAttribute(): ?string
@@ -43,8 +43,33 @@ class BusinessService extends Model
         return $this->hasMany(ServiceSchedule::class);
     }
 
+    public function hourlyPrices(): HasMany
+    {
+        return $this->hasMany(ServiceHourlyPrice::class)->orderBy('day_of_week')->orderBy('start_time');
+    }
+
+    /**
+     * @return array<string, array<string, string>>
+     */
+    public function getHourlyPriceMapAttribute(): array
+    {
+        if (! $this->relationLoaded('hourlyPrices')) {
+            return [];
+        }
+
+        return $this->hourlyPrices
+            ->groupBy('day_of_week')
+            ->map(fn ($prices): array => $prices->mapWithKeys(fn (ServiceHourlyPrice $price): array => [substr($price->start_time, 0, 5) => (string) $price->price])->all())
+            ->all();
+    }
+
     public function closures(): HasMany
     {
         return $this->hasMany(ServiceClosure::class);
+    }
+
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class);
     }
 }

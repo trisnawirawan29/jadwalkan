@@ -2,7 +2,7 @@
 
 @section('title', 'Tempat Bisnis')
 @section('page-title', 'Tempat Bisnis')
-@section('page-subtitle', 'Kelola lokasi olahraga dan layanan yang tersedia.')
+@section('page-subtitle', 'Kelola lokasi dan layanan yang tersedia.')
 
 @section('content')
     <div class="content-card">

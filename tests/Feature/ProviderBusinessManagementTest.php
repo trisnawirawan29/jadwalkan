@@ -45,6 +45,8 @@ class ProviderBusinessManagementTest extends TestCase
             'name' => 'Lapangan Futsal A',
             'business_category_id' => $category->id,
             'type' => 'Futsal',
+            'price_per_hour' => 150000,
+            'hourly_prices' => ['6' => ['08:00' => 175000]],
             'is_active' => 1,
         ]);
         $businessService = BusinessService::query()->firstOrFail();
@@ -63,6 +65,7 @@ class ProviderBusinessManagementTest extends TestCase
         $this->assertDatabaseHas('business_place_business_category', ['business_place_id' => $businessPlace->id, 'business_category_id' => $category->id]);
         $this->assertDatabaseHas('business_place_business_category', ['business_place_id' => $businessPlace->id, 'business_category_id' => $parentCategory->id]);
         $this->assertDatabaseHas('business_services', ['id' => $businessService->id, 'business_place_id' => $businessPlace->id, 'business_category_id' => $category->id, 'name' => 'Lapangan Futsal A']);
+        $this->assertSame(175000.0, (float) $businessService->hourlyPrices()->where('day_of_week', 6)->whereTime('start_time', '08:00:00')->value('price'));
         $this->assertDatabaseHas('service_schedules', ['business_service_id' => $businessService->id, 'day_of_week' => 6, 'start_time' => '08:00', 'end_time' => '10:00']);
     }
 
@@ -79,6 +82,7 @@ class ProviderBusinessManagementTest extends TestCase
             ->assertOk()
             ->assertViewIs('dashboard.provider')
             ->assertSee('Arena Milik Saya')
+            ->assertSee('Booking saya')
             ->assertDontSee('Arena Provider Lain')
             ->assertViewHas('stats', fn ($stats) => $stats[0]['value'] === 1 && $stats[1]['value'] === 1);
     }
@@ -119,6 +123,7 @@ class ProviderBusinessManagementTest extends TestCase
 
         $this->actingAs($provider)->put(route('provider.business-places.services.update', [$businessPlace, $businessService]), [
             'name' => $businessService->name,
+            'price_per_hour' => $businessService->price_per_hour,
             'cover_image' => UploadedFile::fake()->image('first-service.jpg'),
         ])->assertRedirect(route('provider.business-places.services.index', $businessPlace));
         $businessService->refresh();
@@ -127,6 +132,7 @@ class ProviderBusinessManagementTest extends TestCase
 
         $this->actingAs($provider)->put(route('provider.business-places.services.update', [$businessPlace, $businessService]), [
             'name' => $businessService->name,
+            'price_per_hour' => $businessService->price_per_hour,
             'cover_image' => UploadedFile::fake()->image('second-service.png'),
         ])->assertRedirect(route('provider.business-places.services.index', $businessPlace));
         $businessService->refresh();
@@ -279,7 +285,7 @@ class ProviderBusinessManagementTest extends TestCase
         $this->assertDatabaseHas('business_categories', ['name' => 'Panahan', 'parent_id' => $parent->id, 'is_active' => true]);
     }
 
-    public function test_registration_can_create_a_provider_account(): void
+    public function test_registration_creates_a_regular_user_even_when_provider_role_is_submitted(): void
     {
         $response = $this->post(route('register.store'), [
             'name' => 'Penyedia Arena',
@@ -291,7 +297,7 @@ class ProviderBusinessManagementTest extends TestCase
 
         $response->assertRedirect(route('dashboard'));
         $this->assertAuthenticated();
-        $this->assertDatabaseHas('users', ['email' => 'provider@example.com', 'role' => 'provider']);
+        $this->assertDatabaseHas('users', ['email' => 'provider@example.com', 'role' => 'user']);
     }
 
     public function test_provider_cannot_manage_another_providers_business_place(): void

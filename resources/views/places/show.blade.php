@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="{{ app()->getLocale() }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ $businessPlace->name }} · {{ $appName }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.6.0/css/all.min.css">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+</head>
+<body class="landing-page bg-slate-950 text-slate-100 antialiased">
+    @include('partials.public-navbar', ['activePage' => 'places'])
+    <main class="mx-auto max-w-7xl px-5 pb-20 pt-32 lg:px-8 lg:pt-40">
+        <a href="{{ route('places.index') }}" class="landing-text-link"><i class="fa-solid fa-arrow-left mr-2"></i>{{ __('Kembali ke daftar tempat') }}</a>
+        <section class="directory-detail-hero mt-5"><div class="directory-detail-cover @if($businessPlace->cover_image_url) has-image @endif" @if($businessPlace->cover_image_url) style="background-image:url('{{ $businessPlace->cover_image_url }}')" @endif><span class="landing-place-badge"><i class="fa-solid fa-circle-check"></i> {{ __('Aktif') }}</span><span class="directory-detail-mark"><i class="fa-solid fa-building"></i></span></div><div class="p-6 lg:p-8"><div class="flex flex-wrap items-start justify-between gap-4"><div><p class="landing-eyebrow">{{ __('Tempat pilihan') }}</p><h1 class="mt-2 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">{{ $businessPlace->name }}</h1></div><a href="#services" class="landing-primary-button">{{ __('Lihat layanan') }} <i class="fa-solid fa-arrow-down"></i></a></div><p class="mt-4 max-w-3xl leading-7 text-slate-400">{{ $businessPlace->description ?: __('Temukan layanan dan jadwal yang tersedia di tempat ini.') }}</p><div class="mt-5 flex flex-wrap gap-2">@foreach($businessPlace->businessCategories as $category)<span class="landing-tag">{{ $category->name }}</span>@endforeach</div><div class="mt-6 grid gap-3 text-sm text-slate-400 sm:grid-cols-2"><span><i class="fa-solid fa-location-dot mr-2 text-indigo-300"></i>{{ $businessPlace->address ?: __('Alamat belum tersedia') }}</span>@if($businessPlace->phone)<span><i class="fa-solid fa-phone mr-2 text-indigo-300"></i>{{ $businessPlace->phone }}</span>@endif</div></div></section>
+
+        <section id="services" class="mt-12"><div class="flex flex-wrap items-end justify-between gap-4"><div><p class="landing-eyebrow">{{ __('Booking online') }}</p><h2 class="landing-section-title">{{ __('Pilih layanan dan jam booking') }}</h2></div><span class="landing-result-count">{{ $businessPlace->services->count() }} {{ __('layanan') }}</span></div><div class="mt-7 grid gap-5 lg:grid-cols-2">
+            @forelse($businessPlace->services as $service)
+                <article class="directory-service-card"><div class="flex items-start justify-between gap-4"><div><h3 class="text-xl font-bold text-white">{{ $service->name }}</h3><p class="mt-2 text-sm text-slate-400">{{ $service->description ?: __('Layanan siap dipesan sesuai jadwal yang tersedia.') }}</p></div><div class="text-right"><span class="directory-service-icon"><i class="fa-solid fa-calendar-check"></i></span><strong class="mt-2 block text-sm text-emerald-300">Rp {{ number_format((float) $service->price_per_hour, 0, ',', '.') }} / {{ __('jam') }}</strong></div></div><div class="mt-5 rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p class="text-xs font-bold uppercase tracking-widest text-slate-500">{{ __('Jadwal operasional') }}</p><div class="mt-3 flex flex-wrap gap-2">@forelse($service->schedules as $schedule)<span class="directory-schedule-chip">{{ $schedule->day_name }} · {{ substr($schedule->start_time, 0, 5) }}–{{ substr($schedule->end_time, 0, 5) }}</span>@empty<span class="text-sm text-slate-500">{{ __('Belum ada jadwal aktif.') }}</span>@endforelse</div></div>
+                    @php
+                        $bookingStatuses = $service->bookings->map(fn ($booking): array => [
+                            'date' => $booking->booking_date->toDateString(),
+                            'schedule_id' => $booking->service_schedule_id,
+                            'start' => substr($booking->start_time, 0, 5),
+                            'end' => substr($booking->end_time, 0, 5),
+                            'status' => in_array($booking->status, ['payment_submitted', 'confirmed'], true) ? 'booked' : 'held',
+                        ])->values();
+                    @endphp
+                    @auth
+                        <form method="POST" action="{{ route('bookings.store', $businessPlace) }}" class="booking-hourly-form mt-5" data-hourly-price="{{ $service->price_per_hour }}" data-hourly-prices="{{ json_encode($service->hourly_price_map) }}" data-bookings='{{ $bookingStatuses->toJson() }}'>@csrf
+                            <input type="hidden" name="business_schedule_service_id" value="{{ $service->id }}"><input type="hidden" name="service_schedule_id" data-schedule-id required>
+                            @php
+                                $bookingSchedules = $service->schedules->map(function ($schedule): array {
+                                    return [
+                                        'id' => $schedule->id,
+                                        'day' => $schedule->day_of_week,
+                                        'day_name' => $schedule->day_name,
+                                        'start' => substr($schedule->start_time, 0, 5),
+                                        'end' => substr($schedule->end_time, 0, 5),
+                                    ];
+                                })->values()->toJson();
+                            @endphp
+                            <div class="mt-3"><label class="directory-form-label" for="date-{{ $service->id }}">{{ __('Tanggal booking') }}</label><input id="date-{{ $service->id }}" type="date" name="booking_date" min="{{ now()->toDateString() }}" class="directory-select booking-date-selector" data-schedules="{{ $bookingSchedules }}" required></div>
+                            <div class="mt-4"><div class="flex items-center justify-between gap-3"><label class="directory-form-label mb-0">{{ __('Pilih jam booking') }}</label><span class="booking-slot-hint">{{ __('Pilih jam mulai lalu jam selesai') }}</span></div><div class="booking-slot-legend mt-2"><span><i class="booking-legend-dot is-available"></i>{{ __('Tersedia') }}</span><span><i class="booking-legend-dot is-held"></i>{{ __('Sedang hold') }}</span><span><i class="booking-legend-dot is-booked"></i>{{ __('Sudah dibooking') }}</span></div><div class="booking-slot-grid mt-2" data-slot-grid><span class="booking-slot-empty">{{ __('Pilih tanggal untuk melihat slot jam') }}</span></div><input type="hidden" name="start_time" data-start-time required><input type="hidden" name="end_time" data-end-time required><p class="booking-slot-selection" data-slot-selection>{{ __('Belum ada jam dipilih') }}</p></div>
+                            <div class="booking-total-box mt-3"><span>{{ __('Total estimasi') }}</span><strong data-total>Rp 0</strong></div>
+                            <button class="landing-primary-button mt-4 w-full" type="submit"><i class="fa-solid fa-lock"></i>{{ __('Tahan jadwal 10 menit') }}</button><p class="mt-2 text-center text-xs text-slate-500">{{ __('Login diperlukan. Setelah ditahan, selesaikan pembayaran agar booking dikonfirmasi.') }}</p>
+                        </form>
+                    @else
+                        <div class="mt-5 rounded-xl border border-indigo-400/20 bg-indigo-500/10 p-4 text-sm text-indigo-200"><i class="fa-solid fa-circle-info mr-2"></i>{{ __('Silakan') }} <a href="{{ route('login') }}" class="font-bold text-white underline">{{ __('masuk') }}</a> {{ __('atau') }} <a href="{{ route('register') }}" class="font-bold text-white underline">{{ __('daftar') }}</a> {{ __('terlebih dahulu untuk melakukan booking.') }}</div>
+                    @endauth
+                </article>
+            @empty
+                <div class="landing-empty lg:col-span-2">{{ __('Belum ada layanan aktif di tempat ini.') }}</div>
+            @endforelse
+        </div></section>
+    </main>
+    <script>
+        const formatMoney = value => `Rp ${new Intl.NumberFormat('{{ app()->getLocale() === 'en' ? 'en-US' : 'id-ID' }}').format(value)}`;
+        document.querySelectorAll('.booking-hourly-form').forEach(form => {
+            const date = form.querySelector('.booking-date-selector'); const scheduleId = form.querySelector('[data-schedule-id]'); const slotGrid = form.querySelector('[data-slot-grid]'); const start = form.querySelector('[data-start-time]'); const end = form.querySelector('[data-end-time]'); const selection = form.querySelector('[data-slot-selection]'); const total = form.querySelector('[data-total]'); const price = Number(form.dataset.hourlyPrice || 0); const hourlyPrices = JSON.parse(form.dataset.hourlyPrices || '{}'); const schedules = JSON.parse(date.dataset.schedules || '[]'); const bookings = JSON.parse(form.dataset.bookings || '[]'); const labels = {held: '{{ __('Sedang hold') }}', booked: '{{ __('Sudah dibooking') }}', past: '{{ __('Waktu telah lewat') }}'}; let selectedSlots = []; let selectedScheduleId = null; let selectedDay = null;
+            const timeLabel = minutes => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+            const localToday = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; };
+            const isPastSlot = startTime => { if (date.value !== localToday()) return false; const [hours, minutes] = startTime.split(':').map(Number); const slotStart = new Date(); slotStart.setHours(hours, minutes, 0, 0); return slotStart <= new Date(); };
+            const refreshTotal = () => { const hours = selectedSlots.length; const dayPrices = hourlyPrices[selectedDay] || {}; const totalCost = selectedSlots.reduce((sum, slot) => sum + Number(dayPrices[slot.start] ?? hourlyPrices[slot.start] ?? price), 0); total.textContent = formatMoney(totalCost); selection.textContent = hours ? `${selectedSlots[0].label.split('–')[0]}–${selectedSlots[selectedSlots.length - 1].label.split('–')[1]} · ${hours} {{ __('jam') }}` : '{{ __('Belum ada jam dipilih') }}'; };
+            const resetSelection = () => { selectedSlots = []; selectedScheduleId = null; selectedDay = null; scheduleId.value = ''; start.value = ''; end.value = ''; refreshTotal(); };
+            const slotStatus = (scheduleIdValue, startTime, endTime) => bookings.find(booking => booking.date === date.value && Number(booking.schedule_id) === Number(scheduleIdValue) && booking.start < endTime && booking.end > startTime)?.status;
+            const renderSlotsForDate = () => { slotGrid.innerHTML = ''; resetSelection(); if (!date.value) { slotGrid.innerHTML = '<span class="booking-slot-empty">{{ __('Pilih tanggal untuk melihat slot jam') }}</span>'; return; } const dateParts = date.value.split('-').map(Number); const day = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]).getDay() || 7; const matchingSchedules = schedules.filter(item => Number(item.day) === day); if (!matchingSchedules.length) { slotGrid.innerHTML = '<span class="booking-slot-empty">{{ __('Tidak ada jadwal pada tanggal ini') }}</span>'; return; } matchingSchedules.forEach(item => { const group = document.createElement('div'); group.className = 'booking-slot-group'; group.dataset.scheduleId = item.id; group.dataset.day = item.day; group.innerHTML = `<span class="booking-slot-group-label">${item.day_name} · ${item.start}–${item.end}</span><div class="booking-slot-group-items"></div>`; const items = group.querySelector('.booking-slot-group-items'); const [startHour, startMinute] = item.start.split(':').map(Number); const [endHour, endMinute] = item.end.split(':').map(Number); for (let minutes = startHour * 60 + startMinute; minutes + 60 <= endHour * 60 + endMinute; minutes += 60) { const slot = document.createElement('button'); const startTime = timeLabel(minutes); const endTime = timeLabel(minutes + 60); const status = isPastSlot(startTime) ? 'past' : slotStatus(item.id, startTime, endTime); slot.type = 'button'; slot.disabled = Boolean(status); slot.className = `booking-slot${status ? ` is-${status}` : ''}`; slot.dataset.scheduleId = item.id; slot.dataset.start = startTime; slot.dataset.end = endTime; slot.title = status ? labels[status] : '{{ __('Tersedia') }}'; slot.innerHTML = `<span>${slot.dataset.start}–${slot.dataset.end}</span><small>${status ? labels[status] : formatMoney(Number((hourlyPrices[item.day] || {})[slot.dataset.start] ?? hourlyPrices[slot.dataset.start] ?? price))}</small>`; items.appendChild(slot); } slotGrid.appendChild(group); }); };
+            date.addEventListener('change', renderSlotsForDate);
+            slotGrid.addEventListener('click', event => { const clicked = event.target.closest('.booking-slot'); if (!clicked) return; const group = clicked.closest('.booking-slot-group'); const slots = [...group.querySelectorAll('.booking-slot')]; const clickedIndex = slots.indexOf(clicked); if (selectedScheduleId !== clicked.dataset.scheduleId) { selectedSlots = []; selectedScheduleId = clicked.dataset.scheduleId; selectedDay = group.dataset.day; } const firstIndex = selectedSlots.length ? slots.findIndex(slot => slot.dataset.start === selectedSlots[0].start) : -1; const rangeStart = firstIndex >= 0 ? Math.min(firstIndex, clickedIndex) : clickedIndex; const rangeEnd = firstIndex >= 0 ? Math.max(firstIndex, clickedIndex) : clickedIndex; selectedSlots = slots.slice(rangeStart, rangeEnd + 1).map(slot => ({ start: slot.dataset.start, end: slot.dataset.end, label: `${slot.dataset.start}–${slot.dataset.end}` })); scheduleId.value = selectedScheduleId; slotGrid.querySelectorAll('.booking-slot').forEach(slot => slot.classList.toggle('is-selected', selectedSlots.some(item => item.start === slot.dataset.start) && slot.dataset.scheduleId === selectedScheduleId)); start.value = selectedSlots[0]?.start || ''; end.value = selectedSlots[selectedSlots.length - 1]?.end || ''; refreshTotal(); });
+            form.addEventListener('submit', event => { if (!start.value || !end.value) { event.preventDefault(); slotGrid.classList.add('has-error'); selection.textContent = '{{ __('Pilih jam booking terlebih dahulu.') }}'; } });
+        });
+    </script>
+</body>
+</html>

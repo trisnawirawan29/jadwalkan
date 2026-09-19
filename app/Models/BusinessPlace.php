@@ -10,14 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['provider_id', 'name', 'business_category_id', 'cover_image', 'description', 'address', 'google_maps_url', 'latitude', 'longitude', 'province_code', 'province_name', 'regency_code', 'regency_name', 'district_code', 'district_name', 'phone', 'is_active'])]
+#[Fillable(['provider_id', 'name', 'business_category_id', 'cover_image', 'description', 'address', 'google_maps_url', 'latitude', 'longitude', 'province_code', 'province_name', 'regency_code', 'regency_name', 'district_code', 'district_name', 'phone', 'bank_payment_enabled', 'qris_payment_enabled', 'is_active'])]
 class BusinessPlace extends Model
 {
     use HasFactory;
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean', 'latitude' => 'float', 'longitude' => 'float'];
+        return ['is_active' => 'boolean', 'bank_payment_enabled' => 'boolean', 'qris_payment_enabled' => 'boolean', 'latitude' => 'float', 'longitude' => 'float'];
     }
 
     public function provider(): BelongsTo
@@ -47,5 +47,14 @@ class BusinessPlace extends Model
         }
 
         return Storage::disk('public')->url($this->cover_image);
+    }
+
+    public function getQrisImageUrlAttribute(): ?string
+    {
+        if (! $this->qris_image || ! Storage::disk('public')->exists($this->qris_image)) {
+            return null;
+        }
+
+        return Storage::disk('public')->url($this->qris_image);
     }
 }

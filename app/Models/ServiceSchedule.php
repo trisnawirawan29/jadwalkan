@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['business_service_id', 'day_of_week', 'start_time', 'end_time', 'is_closed', 'is_active'])]
 class ServiceSchedule extends Model
@@ -20,6 +21,11 @@ class ServiceSchedule extends Model
     public function businessService(): BelongsTo
     {
         return $this->belongsTo(BusinessService::class);
+    }
+
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class);
     }
 
     public function getDayNameAttribute(): string

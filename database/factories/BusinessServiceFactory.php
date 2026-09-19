@@ -23,6 +23,7 @@ class BusinessServiceFactory extends Factory
             'name' => fake()->randomElement(['Lapangan Tenis 1', 'Lapangan Futsal A', 'Lapangan Bulutangkis 1']),
             'type' => fake()->randomElement(['Tenis', 'Futsal', 'Bulutangkis']),
             'description' => fake()->sentence(),
+            'price_per_hour' => 100000,
             'is_active' => true,
         ];
     }

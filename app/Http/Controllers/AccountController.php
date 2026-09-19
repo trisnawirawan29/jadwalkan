@@ -30,7 +30,17 @@ class AccountController extends Controller
             'job_title' => ['nullable', 'string', 'max:100'], 'phone' => ['nullable', 'string', 'max:30'],
             'location' => ['nullable', 'string', 'max:100'], 'birth_date' => ['nullable', 'date'],
             'website' => ['nullable', 'url', 'max:255'], 'bio' => ['nullable', 'string', 'max:1000'],
+            'payment_bank_name' => ['nullable', 'string', 'max:100'],
+            'payment_bank_account_name' => ['nullable', 'string', 'max:150'],
+            'payment_bank_account_number' => ['nullable', 'string', 'max:50'],
+            'payment_qris_image' => ['sometimes', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp', 'max:5120'],
         ]);
+        if ($request->hasFile('payment_qris_image')) {
+            if ($user->payment_qris_image) {
+                Storage::disk('public')->delete($user->payment_qris_image);
+            }
+            $data['payment_qris_image'] = $request->file('payment_qris_image')->store('payment-qris', 'public');
+        }
         $old = $user->only(array_keys($data));
         $user->update($data);
         AuditLogger::record('profile.updated', 'Profil pengguna diperbarui.', $user, $old, $user->only(array_keys($data)));

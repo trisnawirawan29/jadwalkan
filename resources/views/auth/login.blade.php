@@ -15,6 +15,7 @@
         <div class="brand-lockup"><span class="brand-mark"><i class="fas fa-layer-group"></i></span><span>Nexa<span>Admin</span></span></div>
         <div class="login-heading">
             @if(session('status'))<div class="alert alert-success small">{{ session('status') }}</div>@endif
+            @if(request()->string('booking')->toString() === 'required')<div class="alert alert-info small"><i class="fas fa-lock me-2"></i>{{ __('Login diperlukan untuk booking. Setelah masuk, Anda dapat melihat jadwal dan memilih jam yang tersedia.') }}</div>@endif
             <p class="eyebrow">SELAMAT DATANG KEMBALI</p>
             <h1>Masuk ke akun Anda</h1>
             <p>Kelola semua aktivitas dari satu tempat.</p>

@@ -13,6 +13,10 @@ class DashboardController extends Controller
 {
     public function __invoke(): View|RedirectResponse
     {
+        if (auth()->user()->isProviderStaff()) {
+            return redirect()->route('provider.bookings.index');
+        }
+
         if (auth()->user()->isProvider()) {
             $provider = auth()->user();
             $placeScope = fn ($query) => $query->where('provider_id', $provider->id);
@@ -66,7 +70,25 @@ class DashboardController extends Controller
         }
 
         if (auth()->user()->hasRole('user')) {
-            return view('dashboard.user');
+            $user = auth()->user();
+            $latestApplication = $user->providerApplications()->latest()->first();
+            $upcomingBookingCount = $user->bookings()
+                ->whereIn('status', ['held', 'payment_submitted', 'confirmed'])
+                ->where(function ($query): void {
+                    $query->whereDate('booking_date', '>', today())
+                        ->orWhere(function ($todayQuery): void {
+                            $todayQuery->whereDate('booking_date', today())
+                                ->where('end_time', '>', now()->format('H:i:s'));
+                        });
+                })
+                ->count();
+
+            return view('dashboard.user', [
+                'latestApplication' => $latestApplication,
+                'upcomingBookingCount' => $upcomingBookingCount,
+                'bookingCount' => $user->bookings()->count(),
+                'profileCompletion' => collect([$user->name, $user->email, $user->phone, $user->location, $user->avatar])->filter()->count() * 20,
+            ]);
         }
 
         return view('dashboard', [

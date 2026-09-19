@@ -88,6 +88,9 @@ class ProviderBusinessPlaceController extends Controller
         if ($businessPlace->cover_image) {
             Storage::disk('public')->delete($businessPlace->cover_image);
         }
+        if ($businessPlace->qris_image) {
+            Storage::disk('public')->delete($businessPlace->qris_image);
+        }
         $businessPlace->delete();
 
         return back()->with('success', 'Tempat bisnis berhasil dihapus.');
@@ -121,6 +124,8 @@ class ProviderBusinessPlaceController extends Controller
             'district_code' => ['nullable', 'string', 'max:20'],
             'district_name' => ['nullable', 'string', 'max:100'],
             'phone' => ['nullable', 'string', 'max:30'],
+            'bank_payment_enabled' => ['sometimes', 'boolean'],
+            'qris_payment_enabled' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

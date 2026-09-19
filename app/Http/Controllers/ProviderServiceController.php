@@ -42,8 +42,11 @@ class ProviderServiceController extends Controller
         $this->authorize('view', $businessPlace);
         $this->authorize('create', BusinessService::class);
         $data = $request->validate($this->rules());
+        $hourlyPrices = $this->normalizeHourlyPrices($data['hourly_prices'] ?? []);
+        unset($data['hourly_prices']);
         $data['cover_image'] = $request->file('cover_image')?->store('business-services', 'public');
-        $businessPlace->services()->create($data);
+        $businessService = $businessPlace->services()->create($data);
+        $this->syncHourlyPrices($businessService, $hourlyPrices);
 
         return redirect()->route('provider.business-places.services.index', $businessPlace)->with('success', 'Layanan berhasil ditambahkan.');
     }
@@ -60,6 +63,7 @@ class ProviderServiceController extends Controller
     {
         $this->authorize('view', $businessPlace);
         $this->authorize('update', $businessService);
+        $businessService->load(['schedules', 'hourlyPrices']);
 
         return view('provider.services.form', compact('businessPlace', 'businessService') + ['categories' => $this->categories()]);
     }
@@ -69,6 +73,8 @@ class ProviderServiceController extends Controller
         $this->authorize('view', $businessPlace);
         $this->authorize('update', $businessService);
         $data = $request->validate($this->rules());
+        $hourlyPrices = $this->normalizeHourlyPrices($data['hourly_prices'] ?? []);
+        unset($data['hourly_prices']);
         if ($request->hasFile('cover_image')) {
             if ($businessService->cover_image) {
                 Storage::disk('public')->delete($businessService->cover_image);
@@ -76,6 +82,7 @@ class ProviderServiceController extends Controller
             $data['cover_image'] = $request->file('cover_image')->store('business-services', 'public');
         }
         $businessService->update($data);
+        $this->syncHourlyPrices($businessService, $hourlyPrices);
 
         return redirect()->route('provider.business-places.services.index', $businessPlace)->with('success', 'Layanan berhasil diperbarui.');
     }
@@ -99,6 +106,10 @@ class ProviderServiceController extends Controller
             'business_category_id' => ['nullable', 'integer', Rule::exists('business_categories', 'id')->where(fn ($query) => $query->where('is_active', true))],
             'type' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:2000'],
+            'price_per_hour' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
+            'hourly_prices' => ['nullable', 'array'],
+            'hourly_prices.*' => ['nullable', 'array'],
+            'hourly_prices.*.*' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'cover_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'is_active' => ['sometimes', 'boolean'],
         ];
@@ -113,5 +124,45 @@ class ProviderServiceController extends Controller
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * @param  array<string, mixed>  $hourlyPrices
+     * @return array<string, array<string, float>>
+     */
+    private function normalizeHourlyPrices(array $hourlyPrices): array
+    {
+        $normalized = [];
+
+        foreach ($hourlyPrices as $day => $prices) {
+            if (is_array($prices) && preg_match('/^[1-7]$/', (string) $day) === 1) {
+                foreach ($prices as $time => $price) {
+                    if (preg_match('/^(?:[01]\d|2[0-3]):00$/', (string) $time) === 1 && $price !== null && $price !== '') {
+                        $normalized[(string) $day][(string) $time] = round((float) $price, 2);
+                    }
+                }
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  array<string, array<string, float>>  $hourlyPrices
+     */
+    private function syncHourlyPrices(BusinessService $businessService, array $hourlyPrices): void
+    {
+        $businessService->hourlyPrices()->delete();
+
+        $rows = [];
+        foreach ($hourlyPrices as $day => $prices) {
+            foreach ($prices as $startTime => $price) {
+                $rows[] = ['day_of_week' => (int) $day, 'start_time' => $startTime, 'price' => $price];
+            }
+        }
+
+        if ($rows !== []) {
+            $businessService->hourlyPrices()->createMany($rows);
+        }
     }
 }

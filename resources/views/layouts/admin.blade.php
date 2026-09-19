@@ -52,12 +52,24 @@
             <div class="nav-header">{{ __('MAIN MENU') }}</div>
             <ul class="nav sidebar-menu flex-column" role="menu">
                 <li class="nav-item"><a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}"><i class="nav-icon fas fa-chart-pie"></i><p>{{ __('Dashboard') }}</p></a></li>
+                <li class="nav-item"><a href="{{ route('landing') }}" class="nav-link" target="_blank" rel="noopener"><i class="nav-icon fas fa-compass"></i><p>{{ __('Landing page') }}</p></a></li>
                 @if (auth()->user()->isAdmin())
                     <li class="nav-item"><a href="{{ route('admin.users') }}" class="nav-link {{ request()->routeIs('admin.users*') ? 'active' : '' }}"><i class="nav-icon fas fa-users-cog"></i><p>{{ __('User management') }}</p></a></li>
+                    <li class="nav-item"><a href="{{ route('admin.provider-applications.index') }}" class="nav-link {{ request()->routeIs('admin.provider-applications*') ? 'active' : '' }}"><i class="nav-icon fas fa-user-check"></i><p>Pengajuan provider</p></a></li>
                     <li class="nav-item"><a href="{{ route('admin.business-categories.index') }}" class="nav-link {{ request()->routeIs('admin.business-categories*') ? 'active' : '' }}"><i class="nav-icon fas fa-sitemap"></i><p>{{ __('Business categories') }}</p></a></li>
                 @endif
                 @if (auth()->user()->isProvider())
                     <li class="nav-item"><a href="{{ route('provider.business-places.index') }}" class="nav-link {{ request()->routeIs('provider.business-places*') ? 'active' : '' }}"><i class="nav-icon fas fa-building"></i><p>{{ __('Business Places') }}</p></a></li>
+                    <li class="nav-item"><a href="{{ route('provider.staff.index') }}" class="nav-link {{ request()->routeIs('provider.staff*') ? 'active' : '' }}"><i class="nav-icon fas fa-user-shield"></i><p>Pegawai provider</p></a></li>
+                @endif
+                @if (auth()->user()->isProvider() || auth()->user()->isProviderStaff())
+                    <li class="nav-item"><a href="{{ route('provider.bookings.index') }}" class="nav-link {{ request()->routeIs('provider.bookings*') ? 'active' : '' }}"><i class="nav-icon fas fa-receipt"></i><p>{{ __('Booking masuk') }}</p></a></li>
+                @endif
+                @if (auth()->user()->hasRole('user'))
+                    <li class="nav-item"><a href="{{ route('provider-application.create') }}" class="nav-link {{ request()->routeIs('provider-application.*') ? 'active' : '' }}"><i class="nav-icon fas fa-store-alt"></i><p>Pengajuan provider</p></a></li>
+                @endif
+                @if (auth()->user()->hasRole('user') || auth()->user()->isProvider())
+                    <li class="nav-item"><a href="{{ route('bookings.index') }}" class="nav-link {{ request()->routeIs('bookings.*') ? 'active' : '' }}"><i class="nav-icon fas fa-calendar-check"></i><p>{{ __('Booking saya') }}</p></a></li>
                 @endif
             </ul>
             <div class="nav-header mt-3">{{ __('MY ACCOUNT') }}</div>
@@ -73,11 +85,24 @@
         </nav></div>
     </aside>
 
-    <main class="app-main"><div class="app-content-header"><div class="container-fluid"><div class="d-flex justify-content-between align-items-center"><div><h1 class="page-title">@yield('page-title', 'Dashboard')</h1><p class="text-muted mb-0">@yield('page-subtitle', 'Ringkasan aktivitas bisnis Anda hari ini.')</p></div><div class="text-muted small d-none d-md-block"><i class="far fa-calendar-alt me-2"></i>{{ now()->translatedFormat('l, d F Y') }}</div></div></div></div><div class="app-content"><div class="container-fluid">@yield('content')</div></div></main>
+    <main class="app-main"><div class="app-content-header"><div class="container-fluid"><div class="d-flex justify-content-between align-items-center"><div><h1 class="page-title">@yield('page-title', 'Dashboard')</h1><p class="text-muted mb-0">@yield('page-subtitle', 'Ringkasan aktivitas bisnis Anda hari ini.')</p></div><div class="text-muted small d-none d-md-block"><i class="far fa-calendar-alt me-2"></i>{{ now()->translatedFormat('l, d F Y') }} <span class="timezone-badge" data-indonesia-timezone>WITA</span></div></div></div></div><div class="app-content"><div class="container-fluid">@yield('content')</div></div></main>
     <footer class="app-footer"><strong>© {{ date('Y') }} {{ $appSettings['app_name'] ?? 'NexaAdmin' }}.</strong><span class="text-muted"> {{ $appSettings['footer_text'] ?? 'Semua hak dilindungi.' }}</span><span class="float-end text-muted">v{{ $appSettings['app_version'] ?? '1.0.0' }}</span></footer>
 </div>
 <form id="logout-form" method="POST" action="{{ route('logout') }}" class="d-none" data-confirm="Apakah Anda yakin ingin keluar dari aplikasi?">@csrf</form>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script><script src="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/js/adminlte.min.js"></script><script>(function(){const key='nexa-theme';const root=document.documentElement;const apply=theme=>{root.setAttribute('data-bs-theme',theme);document.querySelector('[data-theme-toggle] i')?.classList.toggle('fa-sun',theme==='dark');document.querySelector('[data-theme-toggle] i')?.classList.toggle('fa-moon',theme!=='dark')};apply(localStorage.getItem(key)||'{{ $appSettings['default_theme'] ?? 'light' }}');document.querySelector('[data-theme-toggle]')?.addEventListener('click',()=>{const next=root.getAttribute('data-bs-theme')==='dark'?'light':'dark';localStorage.setItem(key,next);apply(next)})})();document.querySelectorAll('.flash-close').forEach(button=>button.addEventListener('click',()=>button.parentElement.remove()));document.querySelectorAll('.flash-toast').forEach(toast=>setTimeout(()=>toast.remove(),5000));document.addEventListener('submit',event=>{const form=event.target;if(form.dataset.confirm&&!window.confirm(form.dataset.confirm)){event.preventDefault()}});document.querySelectorAll('[data-confirm-trigger]').forEach(button=>button.addEventListener('click',event=>{if(!window.confirm(button.dataset.confirmTrigger))event.preventDefault()}));</script>
+<script>
+    (() => {
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const offset = -new Date().getTimezoneOffset() / 60;
+        const zoneMap = {'Asia/Jakarta': 'WIB', 'Asia/Pontianak': 'WIB', 'Asia/Makassar': 'WITA', 'Asia/Ujung_Pandang': 'WITA', 'Asia/Jayapura': 'WIT'};
+        const label = zoneMap[timezone] || ({7: 'WIB', 8: 'WITA', 9: 'WIT'}[offset] || 'WITA');
+        document.querySelectorAll('[data-indonesia-timezone]').forEach(element => { element.textContent = label; });
+        document.querySelectorAll('[data-local-datetime]').forEach(element => {
+            const date = new Date(element.dataset.localDatetime);
+            if (!Number.isNaN(date.getTime())) element.textContent = `${new Intl.DateTimeFormat(undefined, {dateStyle: 'medium', timeStyle: 'short'}).format(date)} ${label}`;
+        });
+    })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script><script>(function(){const stack=document.querySelector('.flash-stack');if(!stack||typeof Swal==='undefined')return;const types={success:{icon:'success',title:'Berhasil'},error:{icon:'error',title:'Terjadi kesalahan'},warning:{icon:'warning',title:'Perhatian'},info:{icon:'info',title:'Informasi'}};stack.querySelectorAll('.flash-toast').forEach(item=>{const type=Object.keys(types).find(name=>item.classList.contains('flash-'+name))||'info';const config=types[type];Swal.fire({toast:true,position:'top-end',icon:config.icon,title:config.title,html:item.querySelector('span')?.textContent||'',showConfirmButton:false,timer:4500,timerProgressBar:true,customClass:{popup:'nexa-swal-toast'}})});stack.remove()})();</script>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script><script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script><script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script><script>$(function(){$('[data-data-table]').DataTable({pageLength:10,lengthMenu:[[5,10,25,50,-1],[5,10,25,50,'Semua']],language:{lengthMenu:'Tampilkan _MENU_ data',search:'Cari:',info:'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',infoEmpty:'Tidak ada data',zeroRecords:'Data tidak ditemukan',paginate:{first:'Awal',last:'Akhir',next:'›',previous:'‹'}}});});</script>
 @if (app()->getLocale() === 'en')
