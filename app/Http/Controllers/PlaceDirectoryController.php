@@ -14,6 +14,13 @@ class PlaceDirectoryController extends Controller
     public function __invoke(Request $request): View
     {
         $activePlacesQuery = BusinessPlace::query()->where('is_active', true);
+        $hasExplicitRegionFilter = $request->filled('province') || $request->filled('regency') || $request->filled('district');
+        $useProfileLocation = $request->user() && ! $hasExplicitRegionFilter && ! $request->boolean('all_locations') && $request->user()->province_code;
+        $regionFilters = [
+            'province' => $useProfileLocation ? $request->user()->province_code : $request->input('province'),
+            'regency' => $useProfileLocation ? $request->user()->regency_code : $request->input('regency'),
+            'district' => $useProfileLocation ? $request->user()->district_code : $request->input('district'),
+        ];
         $regionOptions = (clone $activePlacesQuery)
             ->select(['province_code', 'province_name', 'regency_code', 'regency_name', 'district_code', 'district_name'])
             ->get()
@@ -39,9 +46,9 @@ class PlaceDirectoryController extends Controller
                     $query->where('is_active', true);
                 },
             ])
-            ->when($request->filled('province'), fn (Builder $query) => $query->where('province_code', $request->string('province')->toString()))
-            ->when($request->filled('regency'), fn (Builder $query) => $query->where('regency_code', $request->string('regency')->toString()))
-            ->when($request->filled('district'), fn (Builder $query) => $query->where('district_code', $request->string('district')->toString()))
+            ->when($regionFilters['province'], fn (Builder $query, string $province) => $query->where('province_code', $province))
+            ->when($regionFilters['regency'], fn (Builder $query, string $regency) => $query->where('regency_code', $regency))
+            ->when($regionFilters['district'], fn (Builder $query, string $district) => $query->where('district_code', $district))
             ->when($request->filled('category'), function (Builder $query) use ($request): void {
                 $query->whereHas('businessCategories', fn (Builder $categoryQuery) => $categoryQuery->whereKey($request->integer('category')));
             })
@@ -54,6 +61,8 @@ class PlaceDirectoryController extends Controller
             'categories' => $categories,
             'places' => $places,
             'regionOptions' => $regionOptions,
+            'regionFilters' => $regionFilters,
+            'useProfileLocation' => $useProfileLocation,
         ]);
     }
 }

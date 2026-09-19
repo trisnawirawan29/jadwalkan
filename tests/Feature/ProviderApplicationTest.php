@@ -68,6 +68,29 @@ class ProviderApplicationTest extends TestCase
             ->assertSee('Pengajuan provider');
     }
 
+    public function test_user_can_save_region_preferences_on_profile(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+
+        $this->actingAs($user)->put(route('profile.update'), [
+            'name' => $user->name,
+            'email' => $user->email,
+            'province_code' => '51',
+            'province_name' => 'Bali',
+            'regency_code' => '51.01',
+            'regency_name' => 'Kabupaten Jembrana',
+            'district_code' => '51.01.01',
+            'district_name' => 'Negara',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'province_code' => '51',
+            'regency_code' => '51.01',
+            'district_code' => '51.01.01',
+        ]);
+    }
+
     public function test_superadmin_can_approve_application_and_promote_user_to_provider(): void
     {
         $user = User::factory()->create(['role' => 'user']);

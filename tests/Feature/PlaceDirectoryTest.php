@@ -53,6 +53,31 @@ class PlaceDirectoryTest extends TestCase
             ->assertDontSee('Other Place');
     }
 
+    public function test_authenticated_user_profile_region_is_used_for_directory_search(): void
+    {
+        $provider = User::factory()->create(['role' => 'provider']);
+        $user = User::factory()->create([
+            'role' => 'user',
+            'province_code' => '51',
+            'province_name' => 'Bali',
+            'regency_code' => '51.01',
+            'regency_name' => 'Kabupaten Jembrana',
+        ]);
+        BusinessPlace::factory()->create(['provider_id' => $provider->id, 'name' => 'Lokasi Sesuai', 'province_code' => '51', 'regency_code' => '51.01']);
+        BusinessPlace::factory()->create(['provider_id' => $provider->id, 'name' => 'Lokasi Berbeda', 'province_code' => '32', 'regency_code' => '32.01']);
+
+        $this->actingAs($user)
+            ->get(route('places.index'))
+            ->assertOk()
+            ->assertSee('Lokasi Sesuai')
+            ->assertDontSee('Lokasi Berbeda')
+            ->assertSee('Menampilkan tempat di sekitar lokasi profil Anda');
+
+        $this->actingAs($user)
+            ->get(route('places.index', ['all_locations' => 1]))
+            ->assertSee('Lokasi Berbeda');
+    }
+
     public function test_public_place_marks_held_booking_slots_as_unavailable(): void
     {
         $provider = User::factory()->create(['role' => 'provider']);

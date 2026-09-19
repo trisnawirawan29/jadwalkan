@@ -53,6 +53,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/change-password', [AccountController::class, 'password'])->name('password.change');
     Route::put('/change-password', [AccountController::class, 'updatePassword'])->name('password.change.update');
     Route::get('/sessions', [AccountController::class, 'sessions'])->name('sessions');
+    Route::get('/regions/{level}/{code?}', IndonesiaRegionController::class)->name('regions');
     Route::delete('/sessions/{sessionId}', [AccountController::class, 'revokeSession'])->name('sessions.revoke');
     Route::delete('/sessions', [AccountController::class, 'revokeOtherSessions'])->name('sessions.revoke-others');
     Route::middleware('role:user,provider')->group(function (): void {

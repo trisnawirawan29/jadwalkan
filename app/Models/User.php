@@ -15,7 +15,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['name', 'email', 'password', 'avatar', 'role', 'provider_id', 'job_title', 'phone', 'location', 'birth_date', 'website', 'bio', 'payment_bank_name', 'payment_bank_account_name', 'payment_bank_account_number', 'payment_qris_image', 'google_id'])]
+#[Fillable(['name', 'email', 'password', 'avatar', 'role', 'provider_id', 'job_title', 'phone', 'location', 'province_code', 'province_name', 'regency_code', 'regency_name', 'district_code', 'district_name', 'birth_date', 'website', 'bio', 'payment_bank_name', 'payment_bank_account_name', 'payment_bank_account_number', 'payment_qris_image', 'google_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements CanResetPassword
 {
