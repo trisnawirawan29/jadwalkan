@@ -100,7 +100,7 @@
                     --}}
 
                     <div class="mt-4"><label class="form-label" for="description">Deskripsi layanan</label><textarea id="description" name="description" class="form-control" rows="5" maxlength="2000" placeholder="Ceritakan fasilitas atau keunggulan layanan...">{{ old('description', $businessService->description) }}</textarea></div>
-                    <div class="mt-4"><label class="form-label" for="cover_image">Gambar layanan <span class="text-muted">(opsional)</span></label><input id="cover_image" type="file" name="cover_image" class="form-control" accept="image/jpeg,image/png,image/webp"><div class="business-service-field-hint">JPG, PNG, atau WEBP · Maksimal 5 MB</div></div>
+                    <div class="business-service-cover-upload mt-4"><div class="business-service-cover-preview" id="service-cover-preview">@if ($businessService->cover_image_url)<img src="{{ $businessService->cover_image_url }}" alt="{{ $businessService->name }}">@else<i class="fas fa-image"></i><span>{{ __('Belum ada gambar layanan') }}</span>@endif</div><div class="business-service-cover-copy"><label class="form-label" for="cover_image">Gambar layanan <span class="text-muted">({{ __('opsional') }})</span></label><p>{{ __('Tambahkan gambar agar layanan lebih mudah dikenali pelanggan.') }}</p><label class="btn btn-light btn-sm business-service-upload-button" for="cover_image"><i class="fas fa-camera me-1"></i>{{ __('Pilih gambar') }}</label><input id="cover_image" type="file" name="cover_image" class="d-none" accept="image/jpeg,image/png,image/webp"><div class="business-service-field-hint">JPG, PNG, atau WEBP · Maksimal 5 MB</div></div></div>
                     <div class="business-service-status mt-4"><div class="business-service-status-copy"><strong>Status layanan</strong><span>{{ $isActive ? 'Layanan aktif dan dapat diatur jadwalnya.' : 'Layanan nonaktif tidak ditampilkan sebagai pilihan aktif.' }}</span></div><div class="business-service-status-control"><span class="business-service-status-label {{ $isActive ? 'is-active' : '' }}">{{ $isActive ? 'Aktif' : 'Nonaktif' }}</span><label class="business-service-switch" aria-label="Status layanan"><input type="hidden" name="is_active" value="0"><input id="is_active" type="checkbox" name="is_active" value="1" @checked($isActive)><span></span></label></div></div>
                     <div class="business-service-actions"><a href="{{ route('provider.business-places.services.index', $businessPlace) }}" class="btn btn-light">Batal</a><button class="btn btn-primary"><i class="fas fa-check me-2"></i>{{ $businessService->exists ? 'Simpan perubahan' : 'Simpan layanan' }}</button></div>
                 </form>
@@ -156,6 +156,18 @@
                 if (option) option.selected = false;
                 rule.remove();
             }));
+        });
+    </script>
+    <script>
+        document.getElementById('cover_image')?.addEventListener('change', event => {
+            const file = event.target.files?.[0];
+            const preview = document.getElementById('service-cover-preview');
+            if (!file || !preview) return;
+
+            const image = document.createElement('img');
+            image.alt = '{{ __('Preview gambar layanan') }}';
+            image.src = URL.createObjectURL(file);
+            preview.replaceChildren(image);
         });
     </script>
 @endsection

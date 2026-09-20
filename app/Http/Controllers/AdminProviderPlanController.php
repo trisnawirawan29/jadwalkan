@@ -105,7 +105,6 @@ class AdminProviderPlanController extends Controller
         return [
             'name' => ['required', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:500'],
-            'payment_instruction' => ['nullable', 'string', 'max:1000'],
             'max_business_places' => ['required', 'integer', 'min:1', 'max:100000'],
             'max_services_per_place' => ['required', 'integer', 'min:1', 'max:100000'],
             'monthly_price' => ['required', 'numeric', 'min:0', 'max:999999999999.99'],

@@ -1,9 +1,9 @@
 @extends('layouts.admin')
 
 @php($editing = $businessCategory->exists)
-@section('title', $editing ? 'Edit Kategori Bisnis' : 'Tambah Kategori Bisnis')
-@section('page-title', $editing ? 'Edit Kategori Bisnis' : 'Tambah Kategori Bisnis')
-@section('page-subtitle', 'Susun kategori utama dan subkategori untuk penyedia.')
+@section('title', $editing ? __('Edit Kategori Bisnis') : __('Tambah Kategori Bisnis'))
+@section('page-title', $editing ? __('Edit Kategori Bisnis') : __('Tambah Kategori Bisnis'))
+@section('page-subtitle', __('Susun kategori utama dan subkategori untuk penyedia.'))
 
 @section('content')
     <div class="content-card col-12 col-xl-8">

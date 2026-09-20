@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ProviderPaymentMethod;
 use App\Support\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,11 +15,104 @@ use Illuminate\View\View;
 
 class AccountController extends Controller
 {
+    private const COMMON_BANKS = [
+        'Bank Central Asia (BCA)',
+        'Bank Rakyat Indonesia (BRI)',
+        'Bank Mandiri',
+        'Bank Negara Indonesia (BNI)',
+        'Bank Tabungan Negara (BTN)',
+        'CIMB Niaga',
+        'Bank Danamon',
+        'Bank Permata',
+        'OCBC Indonesia',
+        'Maybank Indonesia',
+        'Bank Panin',
+        'Bank Syariah Indonesia (BSI)',
+        'Bank Mega',
+        'Bank Jago',
+        'SeaBank Indonesia',
+        'Jenius',
+        'Lainnya',
+    ];
+
     public function profile(): View
     {
         $sessions = DB::table('sessions')->where('user_id', auth()->id())->orderByDesc('last_activity')->get();
 
         return view('account.profile', compact('sessions'));
+    }
+
+    public function payment(): View
+    {
+        return view('account.payment', [
+            'commonBanks' => self::COMMON_BANKS,
+            'paymentMethods' => auth()->user()->paymentMethods()->latest()->get(),
+        ]);
+    }
+
+    public function storePaymentMethod(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'type' => ['required', Rule::in(['bank_transfer', 'qris'])],
+            'bank_name' => ['required_if:type,bank_transfer', 'nullable', 'string', 'max:100'],
+            'account_name' => ['required_if:type,bank_transfer', 'nullable', 'string', 'max:150'],
+            'account_number' => ['required_if:type,bank_transfer', 'nullable', 'string', 'max:50'],
+            'qris_image' => ['required_if:type,qris', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+
+        if ($request->hasFile('qris_image')) {
+            $data['qris_image'] = $request->file('qris_image')->store('payment-qris', 'public');
+        }
+
+        $request->user()->paymentMethods()->create([
+            ...$data,
+            'is_active' => true,
+        ]);
+
+        return back()->with('success', 'Metode pembayaran berhasil ditambahkan.');
+    }
+
+    public function togglePaymentMethod(Request $request, ProviderPaymentMethod $paymentMethod): RedirectResponse
+    {
+        abort_unless($paymentMethod->provider_id === $request->user()->id, 403);
+
+        $paymentMethod->update(['is_active' => ! $paymentMethod->is_active]);
+
+        return back()->with('success', $paymentMethod->is_active
+            ? 'Metode pembayaran diaktifkan.'
+            : 'Metode pembayaran dinonaktifkan.');
+    }
+
+    public function destroyPaymentMethod(Request $request, ProviderPaymentMethod $paymentMethod): RedirectResponse
+    {
+        abort_unless($paymentMethod->provider_id === $request->user()->id, 403);
+
+        if ($paymentMethod->qris_image) {
+            Storage::disk('public')->delete($paymentMethod->qris_image);
+        }
+
+        $paymentMethod->delete();
+
+        return back()->with('success', 'Metode pembayaran berhasil dihapus.');
+    }
+
+    public function updatePayment(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $data = $request->validate($this->paymentRules());
+
+        if ($request->hasFile('payment_qris_image')) {
+            if ($user->payment_qris_image) {
+                Storage::disk('public')->delete($user->payment_qris_image);
+            }
+            $data['payment_qris_image'] = $request->file('payment_qris_image')->store('payment-qris', 'public');
+        }
+
+        $old = $user->only(array_keys($data));
+        $user->update($data);
+        AuditLogger::record('profile.payment_updated', 'Informasi pembayaran provider diperbarui.', $user, $old, $user->only(array_keys($data)));
+
+        return back()->with('success', 'Informasi pembayaran berhasil disimpan.');
     }
 
     public function updateProfile(Request $request): RedirectResponse
@@ -33,10 +127,7 @@ class AccountController extends Controller
             'regency_code' => ['nullable', 'string', 'max:15'], 'regency_name' => ['nullable', 'string', 'max:100'],
             'district_code' => ['nullable', 'string', 'max:20'], 'district_name' => ['nullable', 'string', 'max:100'],
             'website' => ['nullable', 'url', 'max:255'], 'bio' => ['nullable', 'string', 'max:1000'],
-            'payment_bank_name' => ['nullable', 'string', 'max:100'],
-            'payment_bank_account_name' => ['nullable', 'string', 'max:150'],
-            'payment_bank_account_number' => ['nullable', 'string', 'max:50'],
-            'payment_qris_image' => ['sometimes', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp', 'max:5120'],
+            ...$this->paymentRules(),
         ]);
         if ($request->hasFile('payment_qris_image')) {
             if ($user->payment_qris_image) {
@@ -112,5 +203,15 @@ class AccountController extends Controller
         AuditLogger::record('security.sessions_revoked', 'Semua sesi perangkat lain dihentikan.', $request->user());
 
         return back()->with('success', 'Semua sesi pada perangkat lain telah dihentikan.');
+    }
+
+    private function paymentRules(): array
+    {
+        return [
+            'payment_bank_name' => ['nullable', 'string', 'max:100'],
+            'payment_bank_account_name' => ['nullable', 'string', 'max:150'],
+            'payment_bank_account_number' => ['nullable', 'string', 'max:50'],
+            'payment_qris_image' => ['sometimes', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp', 'max:5120'],
+        ];
     }
 }

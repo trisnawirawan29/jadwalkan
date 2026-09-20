@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Booking;
 use App\Models\BusinessPlace;
+use App\Models\BusinessService;
 use App\Models\ServiceSchedule;
+use App\Models\User;
 use App\Services\ProviderPlanLimitService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,7 +25,7 @@ class BookingController extends Controller
         Booking::cleanupExpiredHolds();
         $filters = $request->validate([
             'view' => ['nullable', 'in:upcoming,history'],
-            'status' => ['nullable', 'in:held,payment_submitted,confirmed,rejected'],
+            'status' => ['nullable', 'in:held,payment_submitted,confirmed,rejected,cancelled'],
             'booking_date' => ['nullable', 'date', 'date_format:Y-m-d'],
             'search' => ['nullable', 'string', 'max:100'],
             'month' => ['nullable', 'date_format:Y-m'],
@@ -66,7 +68,7 @@ class BookingController extends Controller
         };
         $bookingQuery = $applyBookingFilters($request->user()->bookings()->with(['businessService.businessPlace', 'serviceSchedule']));
 
-        if ($display === 'list' && empty($filters['booking_date'] ?? null)) {
+        if (empty($filters['booking_date'] ?? null)) {
             $applyBookingPeriod($bookingQuery);
         }
 
@@ -77,7 +79,8 @@ class BookingController extends Controller
 
         $calendarMonth = Carbon::createFromFormat('Y-m', $filters['month'] ?? now()->format('Y-m'))->startOfMonth();
         $calendarBookingsQuery = $applyBookingFilters($request->user()->bookings()->with(['businessService.businessPlace', 'serviceSchedule']))
-            ->whereBetween('booking_date', [$calendarMonth->toDateString(), $calendarMonth->copy()->endOfMonth()->toDateString()]);
+            ->whereBetween('booking_date', [$calendarMonth->toDateString(), $calendarMonth->copy()->endOfMonth()->toDateString()])
+            ->whereIn('status', ['held', 'confirmed']);
 
         $calendarBookings = $calendarBookingsQuery->orderBy('start_time')->get();
         $calendarBookingsByDate = $calendarBookings->groupBy(fn (Booking $booking): string => $booking->booking_date->toDateString());
@@ -192,6 +195,7 @@ class BookingController extends Controller
     public function show(Request $request, Booking $booking): View|RedirectResponse
     {
         abort_unless($booking->user_id === $request->user()->id, 403);
+        $this->markProviderNotificationsAsRead($request->user(), $booking);
 
         if ($booking->status === 'held' && $booking->expires_at?->isPast()) {
             $booking->delete();
@@ -199,9 +203,22 @@ class BookingController extends Controller
             return redirect()->route('bookings.index')->withErrors(['booking' => 'Waktu hold 10 menit telah berakhir. Booking dihapus.']);
         }
 
-        $booking->load(['businessService.businessPlace.provider', 'serviceSchedule']);
+        $booking->load(['businessService.businessPlace.paymentMethods', 'serviceSchedule']);
+        $extensionOptions = $this->getExtensionOptions($booking);
 
-        return view('bookings.show', compact('booking'));
+        return view('bookings.show', compact('booking', 'extensionOptions'));
+    }
+
+    private function markProviderNotificationsAsRead(User $user, Booking $booking): void
+    {
+        $user->unreadNotifications()
+            ->whereJsonContains('data->source', 'provider')
+            ->where(function ($query) use ($booking): void {
+                $query->whereJsonContains('data->booking_id', $booking->id)
+                    ->orWhere('data->message', 'like', "%{$booking->booking_code}%");
+            })
+            ->get()
+            ->markAsRead();
     }
 
     public function submitPaymentProof(Request $request, Booking $booking): RedirectResponse
@@ -236,5 +253,129 @@ class BookingController extends Controller
         ]);
 
         return back()->with('success', 'Bukti pembayaran berhasil dikirim. Menunggu verifikasi penyedia.');
+    }
+
+    public function extend(Request $request, Booking $booking): RedirectResponse
+    {
+        abort_unless($booking->user_id === $request->user()->id, 403);
+
+        if (! in_array($booking->status, ['held', 'rejected'], true)) {
+            return back()->withErrors(['booking' => 'Booking ini tidak dapat ditambah jamnya.']);
+        }
+
+        if ($booking->status === 'held' && ! $booking->expires_at?->isFuture()) {
+            $booking->delete();
+
+            return redirect()->route('bookings.index')->withErrors(['booking' => 'Waktu hold 10 menit telah berakhir. Booking dihapus.']);
+        }
+
+        $data = $request->validate([
+            'additional_hours' => ['required', 'integer', 'min:1', 'max:12'],
+        ]);
+
+        DB::transaction(function () use ($booking, $data): void {
+            $lockedBooking = Booking::query()
+                ->with(['businessService', 'serviceSchedule'])
+                ->whereKey($booking->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if (! $lockedBooking->serviceSchedule) {
+                throw ValidationException::withMessages(['additional_hours' => 'Jadwal layanan tidak ditemukan.']);
+            }
+            $additionalHours = (int) $data['additional_hours'];
+            $currentEnd = Carbon::parse($lockedBooking->end_time);
+            $newEnd = $currentEnd->copy()->addHours($additionalHours);
+            $scheduleEnd = Carbon::parse($lockedBooking->serviceSchedule->end_time);
+
+            if ($newEnd->gt($scheduleEnd)) {
+                throw ValidationException::withMessages(['additional_hours' => 'Penambahan jam melewati jam selesai layanan.']);
+            }
+
+            $existingBookings = Booking::query()
+                ->where('id', '<>', $lockedBooking->id)
+                ->where('business_service_id', $lockedBooking->business_service_id)
+                ->whereDate('booking_date', $lockedBooking->booking_date)
+                ->whereIn('status', ['held', 'payment_submitted', 'rejected', 'confirmed'])
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($existingBookings as $existingBooking) {
+                if ($existingBooking->status === 'held' && $existingBooking->expires_at?->isPast()) {
+                    $existingBooking->delete();
+
+                    continue;
+                }
+
+                if ($existingBooking->service_schedule_id === $lockedBooking->service_schedule_id
+                    && $existingBooking->start_time < $newEnd->format('H:i:s')
+                    && $existingBooking->end_time > $lockedBooking->start_time) {
+                    throw ValidationException::withMessages(['additional_hours' => 'Jam tambahan bertabrakan dengan booking lain.']);
+                }
+            }
+
+            $additionalCost = $this->calculateBookingCost(
+                $lockedBooking->businessService,
+                $lockedBooking->booking_date,
+                $currentEnd,
+                $newEnd,
+            );
+
+            $lockedBooking->update([
+                'end_time' => $newEnd->format('H:i:s'),
+                'total_cost' => round((float) $lockedBooking->total_cost + $additionalCost, 2),
+            ]);
+        });
+
+        return back()->with('success', 'Jam booking berhasil ditambahkan.');
+    }
+
+    public function cancel(Request $request, Booking $booking): RedirectResponse
+    {
+        abort_unless($booking->user_id === $request->user()->id, 403);
+
+        if (! in_array($booking->status, ['held', 'rejected'], true)) {
+            return back()->withErrors(['booking' => 'Booking ini tidak dapat dibatalkan.']);
+        }
+
+        $booking->update(['status' => 'cancelled', 'expires_at' => null]);
+
+        return redirect()->route('bookings.index')->with('success', 'Booking berhasil dibatalkan.');
+    }
+
+    /**
+     * @return array<int, array{hours: int, end_time: string}>
+     */
+    private function getExtensionOptions(Booking $booking): array
+    {
+        if (! in_array($booking->status, ['held', 'rejected'], true) || ! $booking->serviceSchedule) {
+            return [];
+        }
+
+        $currentEnd = Carbon::parse($booking->end_time);
+        $scheduleEnd = Carbon::parse($booking->serviceSchedule->end_time);
+        $options = [];
+
+        for ($hours = 1; $currentEnd->copy()->addHours($hours)->lte($scheduleEnd); $hours++) {
+            $options[] = ['hours' => $hours, 'end_time' => $currentEnd->copy()->addHours($hours)->format('H:i')];
+        }
+
+        return $options;
+    }
+
+    private function calculateBookingCost(BusinessService $businessService, Carbon $bookingDate, Carbon $startTime, Carbon $endTime): float
+    {
+        $businessService->loadMissing('hourlyPrices');
+        $hourlyPrices = $businessService->hourly_price_map;
+        $dayPrices = $hourlyPrices[(string) $bookingDate->isoWeekday()] ?? [];
+        $totalCost = 0;
+        $priceCursor = $startTime->copy();
+
+        while ($priceCursor->lt($endTime)) {
+            $time = $priceCursor->format('H:i');
+            $totalCost += (float) ($dayPrices[$time] ?? $hourlyPrices[$time] ?? $businessService->price_per_hour);
+            $priceCursor->addHour();
+        }
+
+        return $totalCost;
     }
 }

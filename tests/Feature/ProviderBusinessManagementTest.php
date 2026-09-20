@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\BusinessCategory;
 use App\Models\BusinessPlace;
 use App\Models\BusinessService;
+use App\Models\ProviderPaymentMethod;
 use App\Models\ServiceClosure;
 use App\Models\ServiceSchedule;
 use App\Models\User;
@@ -85,6 +86,120 @@ class ProviderBusinessManagementTest extends TestCase
             ->assertSee('Booking saya')
             ->assertDontSee('Arena Provider Lain')
             ->assertViewHas('stats', fn ($stats) => $stats[0]['value'] === 1 && $stats[1]['value'] === 1);
+    }
+
+    public function test_provider_can_create_one_schedule_for_multiple_days(): void
+    {
+        $provider = User::factory()->create(['role' => 'provider']);
+        $businessPlace = BusinessPlace::factory()->create(['provider_id' => $provider->id]);
+        $businessService = BusinessService::factory()->create(['business_place_id' => $businessPlace->id]);
+
+        $response = $this->actingAs($provider)->post(route('provider.business-places.services.schedules.store', [$businessPlace, $businessService]), [
+            'day_of_week' => [1, 3, 5],
+            'start_time' => '08:00',
+            'end_time' => '10:00',
+            'is_active' => 1,
+        ]);
+
+        $response->assertRedirect(route('provider.business-places.services.schedules.index', [$businessPlace, $businessService]));
+        $this->assertDatabaseCount('service_schedules', 3);
+        foreach ([1, 3, 5] as $day) {
+            $this->assertDatabaseHas('service_schedules', ['business_service_id' => $businessService->id, 'day_of_week' => $day, 'start_time' => '08:00', 'end_time' => '10:00']);
+        }
+    }
+
+    public function test_provider_can_configure_bank_and_qris_payment_methods(): void
+    {
+        Storage::fake('public');
+        $provider = User::factory()->create(['role' => 'provider']);
+
+        $this->actingAs($provider)
+            ->get(route('provider.payment'))
+            ->assertOk()
+            ->assertSee('Bank Central Asia (BCA)');
+
+        $this->actingAs($provider)
+            ->post(route('provider.payment-methods.store'), [
+                'type' => 'bank_transfer',
+                'bank_name' => 'Bank Central Asia (BCA)',
+                'account_name' => 'Provider Saya',
+                'account_number' => '1234567890',
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($provider)
+            ->post(route('provider.payment-methods.store'), [
+                'type' => 'qris',
+                'qris_image' => UploadedFile::fake()->image('qris.png'),
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseCount('provider_payment_methods', 2);
+        $bank = ProviderPaymentMethod::query()->where('provider_id', $provider->id)->where('type', 'bank_transfer')->firstOrFail();
+        $this->actingAs($provider)
+            ->patch(route('provider.payment-methods.toggle', $bank))
+            ->assertRedirect();
+        $this->assertDatabaseHas('provider_payment_methods', ['id' => $bank->id, 'is_active' => false]);
+
+        $qris = ProviderPaymentMethod::query()->where('provider_id', $provider->id)->where('type', 'qris')->firstOrFail();
+        Storage::disk('public')->assertExists($qris->qris_image);
+    }
+
+    public function test_new_business_form_warns_when_provider_has_no_payment_method(): void
+    {
+        $provider = User::factory()->create(['role' => 'provider']);
+
+        $this->actingAs($provider)
+            ->withSession(['locale' => 'id'])
+            ->get(route('provider.business-places.create'))
+            ->assertOk()
+            ->assertSee('Sistem pembayaran belum diatur.')
+            ->assertSee(route('provider.payment'))
+            ->assertDontSee('Buat tempat bisnis')
+            ->assertDontSee('business-place-form-grid');
+    }
+
+    public function test_business_form_only_uses_payment_methods_owned_by_provider(): void
+    {
+        $provider = User::factory()->create(['role' => 'provider']);
+        $otherProvider = User::factory()->create(['role' => 'provider']);
+        $ownMethod = ProviderPaymentMethod::query()->create([
+            'provider_id' => $provider->id,
+            'type' => 'bank_transfer',
+            'bank_name' => 'Bank Milik Saya',
+            'account_name' => 'Provider Saya',
+            'account_number' => '1111111111',
+        ]);
+        $inactiveMethod = ProviderPaymentMethod::query()->create([
+            'provider_id' => $provider->id,
+            'type' => 'bank_transfer',
+            'bank_name' => 'Bank Nonaktif',
+            'account_name' => 'Provider Saya',
+            'account_number' => '2222222222',
+            'is_active' => false,
+        ]);
+        $otherMethod = ProviderPaymentMethod::query()->create([
+            'provider_id' => $otherProvider->id,
+            'type' => 'bank_transfer',
+            'bank_name' => 'Bank Provider Lain',
+            'account_name' => 'Provider Lain',
+            'account_number' => '9999999999',
+        ]);
+
+        $this->actingAs($provider)
+            ->get(route('provider.business-places.create'))
+            ->assertOk()
+            ->assertSee($ownMethod->account_number)
+            ->assertDontSee($inactiveMethod->account_number)
+            ->assertDontSee($otherMethod->account_number);
+
+        $response = $this->actingAs($provider)->post(route('provider.business-places.store'), [
+            'name' => 'Bisnis Provider Saya',
+            'payment_method_ids' => [$otherMethod->id],
+        ]);
+
+        $response->assertSessionHasErrors('payment_method_ids.0');
+        $this->assertDatabaseMissing('business_places', ['name' => 'Bisnis Provider Saya']);
     }
 
     public function test_provider_can_upload_replace_and_delete_a_business_place_cover_image(): void

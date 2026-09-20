@@ -13,6 +13,8 @@ class SystemNotification extends Notification
         private readonly string $title,
         private readonly string $message,
         private readonly string $type = 'info',
+        private readonly string $source = 'system',
+        private readonly ?int $bookingId = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -22,6 +24,12 @@ class SystemNotification extends Notification
 
     public function toDatabase(object $notifiable): array
     {
-        return ['title' => $this->title, 'message' => $this->message, 'type' => $this->type];
+        return array_filter([
+            'title' => $this->title,
+            'message' => $this->message,
+            'type' => $this->type,
+            'source' => $this->source,
+            'booking_id' => $this->bookingId,
+        ], static fn (mixed $value): bool => $value !== null);
     }
 }

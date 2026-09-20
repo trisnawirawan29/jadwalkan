@@ -134,7 +134,6 @@ class DashboardController extends Controller
                     'percentage' => $providerTotal > 0 ? round(($plan->providers_count / $providerTotal) * 100) : 0,
                     'is_active' => $plan->is_active,
                 ]);
-            $unassignedProviders = User::query()->where('role', 'provider')->whereNull('provider_plan_id')->count();
 
             return view('dashboard.admin', [
                 'stats' => [
@@ -150,7 +149,7 @@ class DashboardController extends Controller
                 'recentUpgrades' => $recentUpgrades,
                 'planDistribution' => $planDistribution,
                 'providerTotal' => $providerTotal,
-                'unassignedProviders' => $unassignedProviders,
+                'unassignedProviders' => 0,
                 'pendingApplications' => ProviderApplication::query()->where('status', 'pending')->count(),
                 'pendingUpgrades' => ProviderPlanUpgrade::query()->where('status', 'pending')->count(),
                 'confirmedRevenue' => Booking::query()->where('status', 'confirmed')->whereBetween('created_at', [$monthStart, $monthEnd])->sum('total_cost'),

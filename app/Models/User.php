@@ -72,6 +72,11 @@ class User extends Authenticatable implements CanResetPassword
         return $this->hasMany(BusinessPlace::class, 'provider_id');
     }
 
+    public function paymentMethods(): HasMany
+    {
+        return $this->hasMany(ProviderPaymentMethod::class, 'provider_id');
+    }
+
     public function providerApplications(): HasMany
     {
         return $this->hasMany(ProviderApplication::class);

@@ -36,6 +36,7 @@ Route::get('/', LandingPageController::class)->name('landing');
 Route::get('/places', PlaceDirectoryController::class)->name('places.index');
 Route::get('/user-manual', UserManualController::class)->name('user-manual');
 Route::get('/places/{businessPlace}', [PublicPlaceController::class, 'show'])->name('places.show');
+Route::get('/places/{businessPlace}/bookings', [PublicPlaceController::class, 'show'])->name('places.bookings');
 Route::post('/language', [LanguageController::class, 'update'])->name('language.update');
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.attempt');
@@ -63,12 +64,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/regions/{level}/{code?}', IndonesiaRegionController::class)->name('regions');
     Route::delete('/sessions/{sessionId}', [AccountController::class, 'revokeSession'])->name('sessions.revoke');
     Route::delete('/sessions', [AccountController::class, 'revokeOtherSessions'])->name('sessions.revoke-others');
-    Route::middleware('role:user,provider')->group(function (): void {
-        Route::get('/bookings', [BookingController::class, 'index'])->name('bookings.index');
-        Route::post('/places/{businessPlace}/bookings', [BookingController::class, 'store'])->name('bookings.store');
-        Route::get('/bookings/{booking}', [BookingController::class, 'show'])->name('bookings.show');
-        Route::post('/bookings/{booking}/payment-proof', [BookingController::class, 'submitPaymentProof'])->name('bookings.payment-proof');
-    });
+    Route::get('/bookings', [BookingController::class, 'index'])->name('bookings.index');
+    Route::post('/places/{businessPlace}/bookings', [BookingController::class, 'store'])->name('bookings.store');
+    Route::get('/bookings/{booking}', [BookingController::class, 'show'])->name('bookings.show');
+    Route::post('/bookings/{booking}/payment-proof', [BookingController::class, 'submitPaymentProof'])->name('bookings.payment-proof');
+    Route::patch('/bookings/{booking}/extend', [BookingController::class, 'extend'])->name('bookings.extend');
+    Route::delete('/bookings/{booking}', [BookingController::class, 'cancel'])->name('bookings.cancel');
     Route::middleware('role:user')->group(function (): void {
         Route::get('/provider-application', [ProviderApplicationController::class, 'create'])->name('provider-application.create');
         Route::post('/provider-application', [ProviderApplicationController::class, 'store'])->name('provider-application.store');
@@ -103,11 +104,16 @@ Route::middleware('auth')->group(function () {
         Route::get('bookings/scan', [ProviderBookingController::class, 'scan'])->name('bookings.scan');
         Route::patch('bookings/{booking}/approve', [ProviderBookingController::class, 'approve'])->name('bookings.approve');
         Route::patch('bookings/{booking}/reject', [ProviderBookingController::class, 'reject'])->name('bookings.reject');
+        Route::patch('bookings/{booking}/release', [ProviderBookingController::class, 'releaseRejected'])->name('bookings.release');
         Route::get('bookings/{booking}/check-in', [ProviderBookingController::class, 'checkIn'])->middleware('signed')->name('bookings.check-in');
         Route::patch('bookings/{booking}/check-in', [ProviderBookingController::class, 'confirmAttendance'])->name('bookings.check-in.confirm');
     });
 
     Route::middleware('role:provider')->prefix('provider')->name('provider.')->group(function (): void {
+        Route::get('payment', [AccountController::class, 'payment'])->name('payment');
+        Route::post('payment-methods', [AccountController::class, 'storePaymentMethod'])->name('payment-methods.store');
+        Route::patch('payment-methods/{paymentMethod}/toggle', [AccountController::class, 'togglePaymentMethod'])->name('payment-methods.toggle');
+        Route::delete('payment-methods/{paymentMethod}', [AccountController::class, 'destroyPaymentMethod'])->name('payment-methods.destroy');
         Route::get('plans', [ProviderPlanController::class, 'index'])->name('plans.index');
         Route::post('plans/{providerPlan}/upgrade', [ProviderPlanController::class, 'store'])->name('plans.upgrade');
         Route::get('reports/financial', [ProviderFinancialReportController::class, 'index'])->name('reports.financial');

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Notifications\SystemNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -66,6 +67,13 @@ class ProviderBookingController extends Controller
         }
 
         $booking->update(['status' => 'confirmed', 'paid_at' => now(), 'verified_at' => now(), 'verification_note' => null]);
+        $booking->user->notify(new SystemNotification(
+            'Booking dikonfirmasi provider',
+            "Pembayaran untuk booking {$booking->booking_code} telah disetujui provider.",
+            'success',
+            'provider',
+            $booking->id,
+        ));
 
         return back()->with('success', 'Bukti pembayaran disetujui. Booking sekarang berstatus confirmed.');
     }
@@ -80,8 +88,35 @@ class ProviderBookingController extends Controller
 
         $data = $request->validate(['verification_note' => ['nullable', 'string', 'max:500']]);
         $booking->update(['status' => 'rejected', 'verification_note' => $data['verification_note'] ?? 'Bukti pembayaran perlu diperiksa kembali.']);
+        $booking->user->notify(new SystemNotification(
+            'Bukti pembayaran ditolak provider',
+            "Bukti pembayaran untuk booking {$booking->booking_code} perlu diperiksa kembali.",
+            'info',
+            'provider',
+            $booking->id,
+        ));
 
         return back()->with('warning', 'Bukti pembayaran ditolak. Pengguna dapat mengirim bukti baru.');
+    }
+
+    public function releaseRejected(Request $request, Booking $booking): RedirectResponse
+    {
+        $this->ensureProviderOwnsBooking($request, $booking);
+
+        if ($booking->status !== 'rejected') {
+            return back()->withErrors(['booking' => 'Hanya booking yang ditolak yang dapat dilepas hold-nya.']);
+        }
+
+        $booking->update(['status' => 'expired', 'expires_at' => now()]);
+        $booking->user->notify(new SystemNotification(
+            'Hold booking dilepas provider',
+            "Hold untuk booking {$booking->booking_code} telah dilepas. Silakan buat booking baru jika masih membutuhkan jadwal tersebut.",
+            'info',
+            'provider',
+            $booking->id,
+        ));
+
+        return back()->with('success', 'Hold booking berhasil dilepas. Jadwal sekarang tersedia kembali.');
     }
 
     public function checkIn(Request $request, Booking $booking): View

@@ -32,7 +32,7 @@ class ProviderBusinessPlaceController extends Controller
                 ->with('show_plan_upgrade', true);
         }
 
-        return view('provider.business-places.form', ['businessPlace' => new BusinessPlace, 'categories' => $this->categories()]);
+        return view('provider.business-places.form', ['businessPlace' => new BusinessPlace, 'categories' => $this->categories(), 'paymentMethods' => $request->user()->paymentMethods()->where('is_active', true)->get()]);
     }
 
     public function store(Request $request, ProviderPlanLimitService $planLimits): RedirectResponse
@@ -42,9 +42,11 @@ class ProviderBusinessPlaceController extends Controller
         $data = $request->validate($this->rules());
         $data['cover_image'] = $request->file('cover_image')?->store('business-places', 'public');
         $categoryIds = $data['business_category_ids'] ?? (isset($data['business_category_id']) ? [$data['business_category_id']] : []);
-        unset($data['business_category_ids'], $data['business_category_id']);
+        $paymentMethodIds = $data['payment_method_ids'] ?? [];
+        unset($data['business_category_ids'], $data['business_category_id'], $data['payment_method_ids']);
         $businessPlace = $request->user()->businessPlaces()->create($data);
         $businessPlace->businessCategories()->sync($categoryIds);
+        $businessPlace->paymentMethods()->sync($paymentMethodIds);
 
         return redirect()->route('provider.business-places.index')->with('success', 'Tempat bisnis berhasil ditambahkan.');
     }
@@ -61,7 +63,9 @@ class ProviderBusinessPlaceController extends Controller
     {
         $this->authorize('update', $businessPlace);
 
-        return view('provider.business-places.form', ['businessPlace' => $businessPlace, 'categories' => $this->categories()]);
+        $businessPlace->load('businessCategories', 'paymentMethods');
+
+        return view('provider.business-places.form', ['businessPlace' => $businessPlace, 'categories' => $this->categories(), 'paymentMethods' => $businessPlace->provider->paymentMethods()->where('is_active', true)->get()]);
     }
 
     public function update(Request $request, BusinessPlace $businessPlace): RedirectResponse
@@ -76,9 +80,11 @@ class ProviderBusinessPlaceController extends Controller
             $data['cover_image'] = $newCoverImage;
         }
         $categoryIds = $data['business_category_ids'] ?? (isset($data['business_category_id']) ? [$data['business_category_id']] : []);
-        unset($data['business_category_ids'], $data['business_category_id']);
+        $paymentMethodIds = $data['payment_method_ids'] ?? [];
+        unset($data['business_category_ids'], $data['business_category_id'], $data['payment_method_ids']);
         $businessPlace->update($data);
         $businessPlace->businessCategories()->sync($categoryIds);
+        $businessPlace->paymentMethods()->sync($paymentMethodIds);
 
         return redirect()->route('provider.business-places.index')->with('success', 'Tempat bisnis berhasil diperbarui.');
     }
@@ -112,6 +118,8 @@ class ProviderBusinessPlaceController extends Controller
             'business_category_ids' => ['nullable', 'array'],
             'business_category_ids.*' => ['integer', Rule::exists('business_categories', 'id')->where(fn ($query) => $query->where('is_active', true))],
             'business_category_id' => ['nullable', 'integer', Rule::exists('business_categories', 'id')->where(fn ($query) => $query->where('is_active', true))],
+            'payment_method_ids' => ['nullable', 'array'],
+            'payment_method_ids.*' => ['integer', Rule::exists('provider_payment_methods', 'id')->where(fn ($query) => $query->where('provider_id', request()->user()->id)->where('is_active', true))],
             'cover_image' => ['sometimes', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp', 'max:5120'],
             'description' => ['nullable', 'string', 'max:2000'],
             'address' => ['nullable', 'string', 'max:255'],

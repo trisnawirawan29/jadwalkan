@@ -35,6 +35,11 @@ class BusinessPlace extends Model
         return $this->belongsToMany(BusinessCategory::class, 'business_place_business_category')->withTimestamps();
     }
 
+    public function paymentMethods(): BelongsToMany
+    {
+        return $this->belongsToMany(ProviderPaymentMethod::class, 'business_place_payment_method');
+    }
+
     public function services(): HasMany
     {
         return $this->hasMany(BusinessService::class);

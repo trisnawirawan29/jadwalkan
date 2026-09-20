@@ -1,7 +1,7 @@
 @extends('layouts.admin')
-@section('title', 'Pengaturan Aplikasi')
-@section('page-title', 'Pengaturan Aplikasi')
-@section('page-subtitle', 'Sesuaikan identitas dan tampilan aplikasi Anda.')
+@section('title', __('Pengaturan Aplikasi'))
+@section('page-title', __('Pengaturan Aplikasi'))
+@section('page-subtitle', __('Sesuaikan identitas dan tampilan aplikasi Anda.'))
 @section('content')
 <div class="settings-shell">
     @if (session('success'))<div class="alert alert-success small">{{ session('success') }}</div>@endif

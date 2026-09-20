@@ -1,8 +1,8 @@
 @extends('layouts.admin')
 
-@section('title', 'Kategori Bisnis')
-@section('page-title', 'Kategori Bisnis')
-@section('page-subtitle', 'Kelola kategori utama dan subkategori tempat bisnis.')
+@section('title', __('Kategori Bisnis'))
+@section('page-title', __('Kategori Bisnis'))
+@section('page-subtitle', __('Kelola kategori utama dan subkategori tempat bisnis.'))
 
 @section('content')
     <div class="content-card">

@@ -40,7 +40,16 @@ class ProviderScheduleController extends Controller
         $this->authorize('view', $businessPlace);
         $this->authorize('view', $businessService);
         $this->authorize('create', ServiceSchedule::class);
-        $businessService->schedules()->create($this->validatedSchedule($request, $businessService));
+        if (! is_array($request->input('day_of_week'))) {
+            $request->merge(['day_of_week' => [$request->input('day_of_week')]]);
+        }
+        $data = $this->validatedSchedule($request, $businessService, multipleDays: true);
+        $days = $data['day_of_week'];
+        unset($data['day_of_week']);
+
+        foreach ($days as $day) {
+            $businessService->schedules()->create([...$data, 'day_of_week' => $day]);
+        }
 
         return redirect()->route('provider.business-places.services.schedules.index', [$businessPlace, $businessService])->with('success', 'Jadwal berulang berhasil ditambahkan.');
     }
@@ -83,56 +92,60 @@ class ProviderScheduleController extends Controller
         return back()->with('success', 'Jadwal berhasil dihapus.');
     }
 
-    private function validatedSchedule(Request $request, BusinessService $businessService, ?ServiceSchedule $schedule = null): array
+    private function validatedSchedule(Request $request, BusinessService $businessService, ?ServiceSchedule $schedule = null, bool $multipleDays = false): array
     {
         /** @var ValidationValidator $validator */
         $validator = Validator::make($request->all(), [
-            'day_of_week' => ['required', 'integer', Rule::in(range(1, 7))],
+            'day_of_week' => $multipleDays ? ['required', 'array', 'min:1'] : ['required', 'integer', Rule::in(range(1, 7))],
+            'day_of_week.*' => ['integer', 'distinct', Rule::in(range(1, 7))],
             'start_time' => ['nullable', 'required_unless:is_closed,1', 'date_format:H:i'],
             'end_time' => ['nullable', 'required_unless:is_closed,1', 'date_format:H:i'],
             'is_closed' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
-        $validator->after(function (ValidationValidator $validator) use ($request, $businessService, $schedule): void {
+        $validator->after(function (ValidationValidator $validator) use ($request, $businessService, $schedule, $multipleDays): void {
             $isClosed = $request->boolean('is_closed');
             $startTime = $request->input('start_time');
             $endTime = $request->input('end_time');
+            $days = $multipleDays ? array_map('intval', (array) $request->input('day_of_week', [])) : [$request->integer('day_of_week')];
 
-            if ($isClosed) {
-                $duplicateClosedDay = ServiceSchedule::query()
-                    ->where('business_service_id', $businessService->id)
-                    ->where('day_of_week', $request->integer('day_of_week'))
-                    ->when($schedule, fn ($query) => $query->whereKeyNot($schedule->id))
-                    ->exists();
+            foreach ($days as $index => $day) {
+                if ($isClosed) {
+                    $duplicateClosedDay = ServiceSchedule::query()
+                        ->where('business_service_id', $businessService->id)
+                        ->where('day_of_week', $day)
+                        ->when($schedule, fn ($query) => $query->whereKeyNot($schedule->id))
+                        ->exists();
 
-                if ($duplicateClosedDay) {
-                    $validator->errors()->add('day_of_week', 'Hari ini sudah memiliki jadwal. Edit jadwal yang ada untuk menjadikannya tutup.');
+                    if ($duplicateClosedDay) {
+                        $validator->errors()->add($multipleDays ? "day_of_week.{$index}" : 'day_of_week', 'Hari ini sudah memiliki jadwal. Edit jadwal yang ada untuk menjadikannya tutup.');
+                    }
+
+                    continue;
                 }
 
-                return;
-            }
+                if ($startTime !== null && $endTime !== null && $startTime >= $endTime) {
+                    $validator->errors()->add('end_time', 'Jam selesai harus setelah jam mulai.');
 
-            if ($startTime !== null && $endTime !== null && $startTime >= $endTime) {
-                $validator->errors()->add('end_time', 'Jam selesai harus setelah jam mulai.');
+                    return;
+                }
 
-                return;
-            }
+                if ($validator->errors()->hasAny(['day_of_week', 'start_time', 'end_time'])) {
+                    return;
+                }
 
-            if ($validator->errors()->hasAny(['day_of_week', 'start_time', 'end_time'])) {
-                return;
-            }
+                $overlaps = ServiceSchedule::query()
+                    ->where('business_service_id', $businessService->id)
+                    ->where('day_of_week', $day)
+                    ->when($schedule, fn ($query) => $query->whereKeyNot($schedule->id))
+                    ->where('start_time', '<', $endTime)
+                    ->where('end_time', '>', $startTime)
+                    ->exists();
 
-            $overlaps = ServiceSchedule::query()
-                ->where('business_service_id', $businessService->id)
-                ->where('day_of_week', $request->integer('day_of_week'))
-                ->when($schedule, fn ($query) => $query->whereKeyNot($schedule->id))
-                ->where('start_time', '<', $endTime)
-                ->where('end_time', '>', $startTime)
-                ->exists();
-
-            if ($overlaps) {
-                $validator->errors()->add('start_time', 'Jadwal bertumpuk dengan jadwal lain pada hari yang sama.');
+                if ($overlaps) {
+                    $validator->errors()->add('start_time', 'Jadwal bertumpuk dengan jadwal lain pada hari yang sama.');
+                }
             }
         });
 

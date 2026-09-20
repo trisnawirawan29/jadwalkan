@@ -113,8 +113,25 @@ class ProviderPlanTest extends TestCase
             ->patch(route('admin.users.revoke-provider-plan', $provider))
             ->assertRedirect();
 
-        $this->assertDatabaseHas('users', ['id' => $provider->id, 'provider_plan_id' => null, 'provider_plan_expires_at' => null]);
+        $this->assertDatabaseHas('users', ['id' => $provider->id, 'provider_plan_id' => ProviderPlan::query()->where('is_free', true)->value('id'), 'provider_plan_expires_at' => null]);
         $this->assertDatabaseHas('business_places', ['id' => $place->id, 'is_active' => false]);
+    }
+
+    public function test_promoting_a_user_to_provider_assigns_the_free_plan(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $user = User::factory()->create(['role' => 'user']);
+        $freePlan = ProviderPlan::query()->where('is_free', true)->firstOrFail();
+
+        $this->actingAs($admin)
+            ->put(route('admin.users.role', $user), ['role' => 'provider'])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'role' => 'provider',
+            'provider_plan_id' => $freePlan->id,
+        ]);
     }
 
     public function test_superadmin_can_toggle_provider_plan_status(): void

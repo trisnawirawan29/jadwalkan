@@ -67,6 +67,7 @@ class PlaceDirectoryTest extends TestCase
         BusinessPlace::factory()->create(['provider_id' => $provider->id, 'name' => 'Lokasi Berbeda', 'province_code' => '32', 'regency_code' => '32.01']);
 
         $this->actingAs($user)
+            ->withSession(['locale' => 'id'])
             ->get(route('places.index'))
             ->assertOk()
             ->assertSee('Lokasi Sesuai')
@@ -100,11 +101,56 @@ class PlaceDirectoryTest extends TestCase
         ]);
 
         $this->actingAs(User::factory()->create(['role' => 'user']))
+            ->withSession(['locale' => 'id'])
             ->get(route('places.show', $place))
             ->assertOk()
             ->assertSee('data-bookings')
             ->assertSee('held')
             ->assertSee('Sedang hold')
             ->assertSee('Sudah dibooking');
+    }
+
+    public function test_place_booking_url_can_be_opened_after_a_hold_expires(): void
+    {
+        $provider = User::factory()->create(['role' => 'provider']);
+        $place = BusinessPlace::factory()->create(['provider_id' => $provider->id]);
+
+        $this->actingAs(User::factory()->create(['role' => 'user']))
+            ->get(route('places.bookings', $place))
+            ->assertOk()
+            ->assertViewIs('places.show')
+            ->assertSee($place->name);
+    }
+
+    public function test_every_authenticated_role_sees_a_booking_form_on_a_place_page(): void
+    {
+        $provider = User::factory()->create(['role' => 'provider']);
+        $place = BusinessPlace::factory()->create(['provider_id' => $provider->id]);
+        $service = BusinessService::factory()->create(['business_place_id' => $place->id]);
+        ServiceSchedule::factory()->create(['business_service_id' => $service->id]);
+
+        $this->actingAs(User::factory()->create(['role' => 'admin']))
+            ->get(route('places.show', $place))
+            ->assertOk()
+            ->assertSee('name="service_schedule_id"', false);
+
+        $this->actingAs(User::factory()->create(['role' => 'manager']))
+            ->get(route('places.show', $place))
+            ->assertOk()
+            ->assertSee('name="service_schedule_id"', false);
+    }
+
+    public function test_guest_is_told_to_login_before_booking(): void
+    {
+        $provider = User::factory()->create(['role' => 'provider']);
+        $place = BusinessPlace::factory()->create(['provider_id' => $provider->id]);
+        $service = BusinessService::factory()->create(['business_place_id' => $place->id]);
+        ServiceSchedule::factory()->create(['business_service_id' => $service->id]);
+
+        $this->withSession(['locale' => 'id'])
+            ->get(route('places.show', $place))
+            ->assertOk()
+            ->assertSee('Anda harus login dulu untuk melakukan booking.')
+            ->assertDontSee('name="service_schedule_id"', false);
     }
 }

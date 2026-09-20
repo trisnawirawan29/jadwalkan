@@ -76,10 +76,21 @@ class AdminUserController extends Controller
 
     public function updateRole(Request $request, User $user): RedirectResponse
     {
-        $data = $request->validate(['role' => ['required', Rule::in(['admin', 'manager', 'provider', 'user'])]]);
+        $data = $request->validate(['role' => ['required', Rule::in(['admin', 'manager', 'provider', 'user', 'superadmin'])]]);
 
         if ($user->is(auth()->user()) && $data['role'] !== 'admin') {
             return back()->withErrors(['role' => 'Anda tidak dapat menghapus role admin dari akun sendiri.']);
+        }
+
+        if ($data['role'] === 'provider' && ! $user->provider_plan_id) {
+            $freePlan = ProviderPlan::query()->where('is_free', true)->firstOrFail();
+            $data['provider_plan_id'] = $freePlan->id;
+            $data['provider_plan_started_at'] = now();
+            $data['provider_plan_expires_at'] = null;
+        } elseif ($data['role'] !== 'provider') {
+            $data['provider_plan_id'] = null;
+            $data['provider_plan_started_at'] = null;
+            $data['provider_plan_expires_at'] = null;
         }
 
         $user->update($data);
@@ -112,17 +123,19 @@ class AdminUserController extends Controller
         }
 
         $planName = $user->providerPlan?->name ?: 'provider';
-        DB::transaction(function () use ($user): void {
+        $freePlan = ProviderPlan::query()->where('is_free', true)->firstOrFail();
+
+        DB::transaction(function () use ($user, $freePlan): void {
             $user->update([
-                'provider_plan_id' => null,
-                'provider_plan_started_at' => null,
+                'provider_plan_id' => $freePlan->id,
+                'provider_plan_started_at' => now(),
                 'provider_plan_expires_at' => null,
             ]);
             $user->businessPlaces()->update(['is_active' => false]);
         });
         AuditLogger::record('provider_plan.revoked', "Paket {$planName} dicabut dari provider {$user->email}.", $user, [], ['provider_plan_id' => null]);
 
-        return back()->with('success', "Paket {$planName} dari {$user->name} berhasil dicabut. Bisnis provider dinonaktifkan.");
+        return back()->with('success', "Paket {$planName} dari {$user->name} berhasil diubah ke paket Free. Bisnis provider dinonaktifkan.");
     }
 
     private function rules(?User $user = null): array
@@ -130,8 +143,7 @@ class AdminUserController extends Controller
         return [
             'name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user?->id)],
-            'role' => ['required', Rule::in(['admin', 'manager', 'provider', 'user'])],
-            'provider_plan_id' => ['nullable', 'integer', Rule::exists('provider_plans', 'id')],
+            'role' => ['required', Rule::in(['admin', 'manager', 'provider', 'user', 'superadmin'])],
             'password' => [$user ? 'nullable' : 'required', 'confirmed', Password::min(8)],
         ];
     }
