@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Setting;
 use App\Models\User;
 use App\Support\AuditLogger;
 use Illuminate\Http\RedirectResponse;
@@ -21,7 +22,9 @@ class AuthController extends Controller
             return redirect()->route('dashboard');
         }
 
-        return view('auth.login');
+        return view('auth.login', [
+            'settings' => Setting::pluck('value', 'key'),
+        ]);
     }
 
     public function showRegister(): View|RedirectResponse
