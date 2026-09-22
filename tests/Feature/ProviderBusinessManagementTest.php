@@ -38,6 +38,7 @@ class ProviderBusinessManagementTest extends TestCase
             'regency_name' => 'Kabupaten Badung',
             'district_code' => '51.03.01',
             'district_name' => 'Kuta',
+            'hold_duration_minutes' => 25,
             'is_active' => 1,
         ]);
         $businessPlace = BusinessPlace::query()->firstOrFail();
@@ -62,7 +63,7 @@ class ProviderBusinessManagementTest extends TestCase
         $placeResponse->assertRedirect(route('provider.business-places.index'));
         $serviceResponse->assertRedirect(route('provider.business-places.services.index', $businessPlace));
         $scheduleResponse->assertRedirect(route('provider.business-places.services.schedules.index', [$businessPlace, $businessService]));
-        $this->assertDatabaseHas('business_places', ['id' => $businessPlace->id, 'provider_id' => $provider->id, 'name' => 'Arena Sport Center', 'latitude' => '-8.6705000', 'longitude' => '115.2126000', 'province_code' => '51', 'regency_code' => '51.03', 'district_code' => '51.03.01']);
+        $this->assertDatabaseHas('business_places', ['id' => $businessPlace->id, 'provider_id' => $provider->id, 'name' => 'Arena Sport Center', 'hold_duration_minutes' => 25, 'latitude' => '-8.6705000', 'longitude' => '115.2126000', 'province_code' => '51', 'regency_code' => '51.03', 'district_code' => '51.03.01']);
         $this->assertDatabaseHas('business_place_business_category', ['business_place_id' => $businessPlace->id, 'business_category_id' => $category->id]);
         $this->assertDatabaseHas('business_place_business_category', ['business_place_id' => $businessPlace->id, 'business_category_id' => $parentCategory->id]);
         $this->assertDatabaseHas('business_services', ['id' => $businessService->id, 'business_place_id' => $businessPlace->id, 'business_category_id' => $category->id, 'name' => 'Lapangan Futsal A']);
@@ -210,6 +211,7 @@ class ProviderBusinessManagementTest extends TestCase
 
         $this->actingAs($provider)->put(route('provider.business-places.update', $businessPlace), [
             'name' => $businessPlace->name,
+            'hold_duration_minutes' => $businessPlace->hold_duration_minutes,
             'cover_image' => UploadedFile::fake()->image('first-cover.jpg'),
         ])->assertRedirect(route('provider.business-places.index'));
         $businessPlace->refresh();
@@ -218,6 +220,7 @@ class ProviderBusinessManagementTest extends TestCase
 
         $this->actingAs($provider)->put(route('provider.business-places.update', $businessPlace), [
             'name' => $businessPlace->name,
+            'hold_duration_minutes' => $businessPlace->hold_duration_minutes,
             'cover_image' => UploadedFile::fake()->image('second-cover.png'),
         ])->assertRedirect(route('provider.business-places.index'));
         $businessPlace->refresh();

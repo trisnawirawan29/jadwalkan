@@ -10,14 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['provider_id', 'name', 'business_category_id', 'cover_image', 'description', 'address', 'google_maps_url', 'latitude', 'longitude', 'province_code', 'province_name', 'regency_code', 'regency_name', 'district_code', 'district_name', 'phone', 'bank_payment_enabled', 'qris_payment_enabled', 'is_active'])]
+#[Fillable(['provider_id', 'name', 'business_category_id', 'cover_image', 'description', 'address', 'google_maps_url', 'latitude', 'longitude', 'province_code', 'province_name', 'regency_code', 'regency_name', 'district_code', 'district_name', 'phone', 'hold_duration_minutes', 'bank_payment_enabled', 'qris_payment_enabled', 'is_active'])]
 class BusinessPlace extends Model
 {
     use HasFactory;
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean', 'bank_payment_enabled' => 'boolean', 'qris_payment_enabled' => 'boolean', 'latitude' => 'float', 'longitude' => 'float'];
+        return ['is_active' => 'boolean', 'bank_payment_enabled' => 'boolean', 'qris_payment_enabled' => 'boolean', 'latitude' => 'float', 'longitude' => 'float', 'hold_duration_minutes' => 'integer'];
     }
 
     public function provider(): BelongsTo

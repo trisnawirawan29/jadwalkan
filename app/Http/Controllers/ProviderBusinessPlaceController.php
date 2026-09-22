@@ -141,6 +141,7 @@ class ProviderBusinessPlaceController extends Controller
             'district_code' => ['nullable', 'string', 'max:20'],
             'district_name' => ['nullable', 'string', 'max:100'],
             'phone' => ['nullable', 'string', 'max:30'],
+            'hold_duration_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
             'bank_payment_enabled' => ['sometimes', 'boolean'],
             'qris_payment_enabled' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],

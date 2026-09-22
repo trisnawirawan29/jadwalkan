@@ -51,6 +51,25 @@ class BookingTest extends TestCase
         $this->assertTrue(Booking::latest('id')->firstOrFail()->expires_at->between(now()->addMinutes(9), now()->addMinutes(11)));
     }
 
+    public function test_booking_uses_the_business_hold_duration(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $provider = User::factory()->create(['role' => 'provider']);
+        $place = BusinessPlace::factory()->create(['provider_id' => $provider->id, 'hold_duration_minutes' => 25]);
+        $service = BusinessService::factory()->create(['business_place_id' => $place->id]);
+        $schedule = ServiceSchedule::factory()->create(['business_service_id' => $service->id, 'day_of_week' => Carbon::MONDAY]);
+        $bookingDate = today()->next(Carbon::MONDAY);
+
+        $this->actingAs($user)->post(route('bookings.store', $place), [
+            'service_schedule_id' => $schedule->id,
+            'booking_date' => $bookingDate->toDateString(),
+            'start_time' => '08:00',
+            'end_time' => '09:00',
+        ])->assertRedirect();
+
+        $this->assertTrue(Booking::latest('id')->firstOrFail()->expires_at->between(now()->addMinutes(24), now()->addMinutes(26)));
+    }
+
     public function test_superadmin_can_hold_a_matching_schedule_for_ten_minutes(): void
     {
         $superadmin = User::factory()->create(['role' => 'superadmin']);

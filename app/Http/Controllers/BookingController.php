@@ -152,7 +152,8 @@ class BookingController extends Controller
             $priceCursor->addHour();
         }
 
-        $booking = DB::transaction(function () use ($data, $request, $schedule, $bookingDate, $startTime, $endTime, $totalCost): Booking {
+        $holdDurationMinutes = (int) ($businessPlace->hold_duration_minutes ?: 10);
+        $booking = DB::transaction(function () use ($data, $request, $schedule, $bookingDate, $startTime, $endTime, $totalCost, $holdDurationMinutes): Booking {
             $existingBookings = Booking::query()
                 ->where('business_service_id', $schedule->business_service_id)
                 ->whereDate('booking_date', $bookingDate)
@@ -184,12 +185,12 @@ class BookingController extends Controller
                 'total_cost' => round($totalCost, 2),
                 'booking_code' => 'BK-'.Str::upper(Str::random(10)),
                 'status' => 'held',
-                'expires_at' => now()->addMinutes(10),
+                'expires_at' => now()->addMinutes($holdDurationMinutes),
                 'notes' => $data['notes'] ?? null,
             ]);
         });
 
-        return redirect()->route('bookings.show', $booking)->with('success', 'Jadwal berhasil ditahan selama 10 menit. Selesaikan pembayaran untuk mengonfirmasi booking.');
+        return redirect()->route('bookings.show', $booking)->with('success', "Jadwal berhasil ditahan selama {$holdDurationMinutes} menit. Selesaikan pembayaran untuk mengonfirmasi booking.");
     }
 
     public function show(Request $request, Booking $booking): View|RedirectResponse
@@ -200,7 +201,7 @@ class BookingController extends Controller
         if ($booking->status === 'held' && $booking->expires_at?->isPast()) {
             $booking->delete();
 
-            return redirect()->route('bookings.index')->withErrors(['booking' => 'Waktu hold 10 menit telah berakhir. Booking dihapus.']);
+            return redirect()->route('bookings.index')->withErrors(['booking' => 'Waktu hold telah berakhir. Booking dihapus.']);
         }
 
         $booking->load(['businessService.businessPlace.paymentMethods', 'serviceSchedule']);
@@ -232,7 +233,7 @@ class BookingController extends Controller
         if ($booking->status === 'held' && ! $booking->expires_at?->isFuture()) {
             $booking->delete();
 
-            return back()->withErrors(['booking' => 'Waktu hold 10 menit telah berakhir. Silakan buat booking baru.']);
+            return back()->withErrors(['booking' => 'Waktu hold telah berakhir. Silakan buat booking baru.']);
         }
 
         $data = $request->validate([
@@ -266,7 +267,7 @@ class BookingController extends Controller
         if ($booking->status === 'held' && ! $booking->expires_at?->isFuture()) {
             $booking->delete();
 
-            return redirect()->route('bookings.index')->withErrors(['booking' => 'Waktu hold 10 menit telah berakhir. Booking dihapus.']);
+            return redirect()->route('bookings.index')->withErrors(['booking' => 'Waktu hold telah berakhir. Booking dihapus.']);
         }
 
         $data = $request->validate([

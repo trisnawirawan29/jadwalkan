@@ -30,6 +30,7 @@ class BusinessPlaceFactory extends Factory
             'district_code' => '51.01.01',
             'district_name' => 'Negara',
             'phone' => fake()->numerify('08##########'),
+            'hold_duration_minutes' => 10,
             'is_active' => true,
         ];
     }
