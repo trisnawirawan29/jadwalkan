@@ -15,6 +15,7 @@ use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\IndonesiaRegionController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\LanguageController;
+use App\Http\Controllers\NearbyAvailablePlaceController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlaceDirectoryController;
 use App\Http\Controllers\ProviderApplicationController;
@@ -33,6 +34,7 @@ use App\Http\Controllers\UserManualController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', LandingPageController::class)->name('landing');
+Route::get('/nearby-available-places', NearbyAvailablePlaceController::class)->name('nearby-available-places');
 Route::get('/places', PlaceDirectoryController::class)->name('places.index');
 Route::get('/user-manual', UserManualController::class)->name('user-manual');
 Route::get('/places/{businessPlace}', [PublicPlaceController::class, 'show'])->name('places.show');

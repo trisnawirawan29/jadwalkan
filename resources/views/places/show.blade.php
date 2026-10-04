@@ -54,6 +54,24 @@
                 <div class="landing-empty lg:col-span-2">{{ __('Belum ada layanan aktif di tempat ini.') }}</div>
             @endforelse
         </div></section>
+        <div id="booking-confirmation-modal" class="booking-confirmation-modal" hidden>
+            <div class="booking-confirmation-backdrop" data-booking-confirm-cancel></div>
+            <div class="booking-confirmation-dialog" role="dialog" aria-modal="true" aria-labelledby="booking-confirmation-title">
+                <button type="button" class="booking-confirmation-close" data-booking-confirm-cancel aria-label="{{ __('Tutup') }}"><i class="fa-solid fa-xmark"></i></button>
+                <span class="booking-confirmation-icon"><i class="fa-solid fa-lock"></i></span>
+                <p class="landing-eyebrow mt-4">{{ __('Konfirmasi booking') }}</p>
+                <h2 id="booking-confirmation-title">{{ __('Tahan jadwal ini?') }}</h2>
+                <p class="booking-confirmation-copy">{{ __('Jadwal akan ditahan selama :minutes menit. Pastikan informasi booking Anda sudah benar.', ['minutes' => $businessPlace->hold_duration_minutes]) }}</p>
+                <div class="booking-confirmation-summary">
+                    <div><span>{{ __('Tempat') }}</span><strong data-confirm-place>{{ $businessPlace->name }}</strong></div>
+                    <div><span>{{ __('Layanan') }}</span><strong data-confirm-service>-</strong></div>
+                    <div><span>{{ __('Tanggal') }}</span><strong data-confirm-date>-</strong></div>
+                    <div><span>{{ __('Jam') }}</span><strong data-confirm-time>-</strong></div>
+                    <div class="booking-confirmation-total"><span>{{ __('Total estimasi') }}</span><strong data-confirm-total>Rp 0</strong></div>
+                </div>
+                <div class="booking-confirmation-actions"><button type="button" class="landing-secondary-button" data-booking-confirm-cancel>{{ __('Kembali') }}</button><button type="button" class="landing-primary-button" data-booking-confirm-submit><i class="fa-solid fa-check"></i>{{ __('Konfirmasi tahan jadwal') }}</button></div>
+            </div>
+        </div>
     </main>
     <script>
         const formatMoney = value => `Rp ${new Intl.NumberFormat('{{ app()->getLocale() === 'en' ? 'en-US' : 'id-ID' }}').format(value)}`;
@@ -68,8 +86,28 @@
             const renderSlotsForDate = () => { slotGrid.innerHTML = ''; resetSelection(); if (!date.value) { slotGrid.innerHTML = '<span class="booking-slot-empty">{{ __('Pilih tanggal untuk melihat slot jam') }}</span>'; return; } if (closures.includes(date.value)) { slotGrid.innerHTML = `<span class="booking-slot-empty">${labels.closed}</span>`; return; } const dateParts = date.value.split('-').map(Number); const day = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]).getDay() || 7; const matchingSchedules = schedules.filter(item => Number(item.day) === day); if (!matchingSchedules.length) { slotGrid.innerHTML = '<span class="booking-slot-empty">{{ __('Tidak ada jadwal pada tanggal ini') }}</span>'; return; } matchingSchedules.forEach(item => { const group = document.createElement('div'); group.className = 'booking-slot-group'; group.dataset.scheduleId = item.id; group.dataset.day = item.day; group.innerHTML = `<span class="booking-slot-group-label">${item.day_name} · ${item.start}–${item.end}</span><div class="booking-slot-group-items"></div>`; const items = group.querySelector('.booking-slot-group-items'); const [startHour, startMinute] = item.start.split(':').map(Number); const [endHour, endMinute] = item.end.split(':').map(Number); for (let minutes = startHour * 60 + startMinute; minutes + 60 <= endHour * 60 + endMinute; minutes += 60) { const slot = document.createElement('button'); const startTime = timeLabel(minutes); const endTime = timeLabel(minutes + 60); const status = isPastSlot(startTime) ? 'past' : slotStatus(item.id, startTime, endTime); slot.type = 'button'; slot.disabled = Boolean(status); slot.className = `booking-slot${status ? ` is-${status}` : ''}`; slot.dataset.scheduleId = item.id; slot.dataset.start = startTime; slot.dataset.end = endTime; slot.title = status ? labels[status] : '{{ __('Tersedia') }}'; slot.innerHTML = `<span>${slot.dataset.start}–${slot.dataset.end}</span><small>${status ? labels[status] : formatMoney(Number((hourlyPrices[item.day] || {})[slot.dataset.start] ?? hourlyPrices[slot.dataset.start] ?? price))}</small>`; items.appendChild(slot); } slotGrid.appendChild(group); }); };
             date.addEventListener('change', renderSlotsForDate);
             slotGrid.addEventListener('click', event => { const clicked = event.target.closest('.booking-slot'); if (!clicked) return; const group = clicked.closest('.booking-slot-group'); const slots = [...group.querySelectorAll('.booking-slot')]; const clickedIndex = slots.indexOf(clicked); const clickedIsSelected = selectedSlots.some(item => item.start === clicked.dataset.start) && clicked.dataset.scheduleId === selectedScheduleId; if (clickedIsSelected) { resetSelection(); slotGrid.querySelectorAll('.booking-slot').forEach(slot => slot.classList.remove('is-selected')); return; } if (selectedScheduleId !== clicked.dataset.scheduleId) { selectedSlots = []; selectedScheduleId = clicked.dataset.scheduleId; selectedDay = group.dataset.day; } const firstIndex = selectedSlots.length ? slots.findIndex(slot => slot.dataset.start === selectedSlots[0].start) : -1; const rangeStart = firstIndex >= 0 ? Math.min(firstIndex, clickedIndex) : clickedIndex; const rangeEnd = firstIndex >= 0 ? Math.max(firstIndex, clickedIndex) : clickedIndex; const range = slots.slice(rangeStart, rangeEnd + 1); if (range.some(slot => slot.disabled)) return; selectedSlots = range.map(slot => ({ start: slot.dataset.start, end: slot.dataset.end, label: `${slot.dataset.start}–${slot.dataset.end}` })); scheduleId.value = selectedScheduleId; slotGrid.querySelectorAll('.booking-slot').forEach(slot => slot.classList.toggle('is-selected', selectedSlots.some(item => item.start === slot.dataset.start) && slot.dataset.scheduleId === selectedScheduleId)); start.value = selectedSlots[0]?.start || ''; end.value = selectedSlots[selectedSlots.length - 1]?.end || ''; refreshTotal(); });
-            form.addEventListener('submit', event => { if (!start.value || !end.value) { event.preventDefault(); slotGrid.classList.add('has-error'); selection.textContent = '{{ __('Pilih jam booking terlebih dahulu.') }}'; } });
+            form.addEventListener('submit', event => {
+                if (!start.value || !end.value) { event.preventDefault(); slotGrid.classList.add('has-error'); selection.textContent = '{{ __('Pilih jam booking terlebih dahulu.') }}'; return; }
+                event.preventDefault();
+                window.openBookingConfirmation(form);
+            });
         });
+        const bookingConfirmationModal = document.getElementById('booking-confirmation-modal');
+        let bookingConfirmationForm = null;
+        window.openBookingConfirmation = form => {
+            bookingConfirmationForm = form;
+            bookingConfirmationModal.querySelector('[data-confirm-service]').textContent = form.closest('.directory-service-card').querySelector('h3').textContent.trim();
+            bookingConfirmationModal.querySelector('[data-confirm-date]').textContent = new Date(`${form.querySelector('.booking-date-selector').value}T00:00:00`).toLocaleDateString('{{ app()->getLocale() === 'en' ? 'en-US' : 'id-ID' }}', { day: 'numeric', month: 'short', year: 'numeric' });
+            bookingConfirmationModal.querySelector('[data-confirm-time]').textContent = form.querySelector('[data-slot-selection]').textContent.trim();
+            bookingConfirmationModal.querySelector('[data-confirm-total]').textContent = form.querySelector('[data-total]').textContent.trim();
+            bookingConfirmationModal.hidden = false;
+            document.body.classList.add('booking-confirmation-open');
+            bookingConfirmationModal.querySelector('[data-booking-confirm-submit]').focus();
+        };
+        const closeBookingConfirmation = () => { bookingConfirmationModal.hidden = true; bookingConfirmationForm = null; document.body.classList.remove('booking-confirmation-open'); };
+        bookingConfirmationModal.querySelectorAll('[data-booking-confirm-cancel]').forEach(button => button.addEventListener('click', closeBookingConfirmation));
+        bookingConfirmationModal.querySelector('[data-booking-confirm-submit]').addEventListener('click', () => { if (bookingConfirmationForm) bookingConfirmationForm.submit(); });
+        document.addEventListener('keydown', event => { if (event.key === 'Escape' && !bookingConfirmationModal.hidden) closeBookingConfirmation(); });
     </script>
 </body>
 </html>

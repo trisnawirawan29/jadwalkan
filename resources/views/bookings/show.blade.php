@@ -5,7 +5,39 @@
 @section('page-subtitle', $booking->businessService->businessPlace->name)
 
 @section('content')
-    @if (session('success'))
+    <style>
+        .booking-held-alert { position: relative; overflow: hidden; padding: 22px; border: 0; border-radius: 20px; color: #fff; background: linear-gradient(125deg, #172554, #3730a3 58%, #6366f1); box-shadow: 0 14px 30px rgba(55, 48, 163, .2); }
+        .booking-held-alert::after { content: ''; position: absolute; width: 180px; height: 180px; right: -70px; top: -100px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 50%; }
+        .booking-held-alert-heading { position: relative; z-index: 1; display: flex; align-items: flex-start; gap: 13px; }
+        .booking-held-alert-icon { display: grid; place-items: center; flex: 0 0 auto; width: 42px; height: 42px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 13px; color: #fff; background: rgba(255, 255, 255, .14); font-size: 18px; }
+        .booking-held-alert small { display: block; color: #c9c5ff; font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+        .booking-held-alert h3 { margin: 3px 0 0; color: #fff; font-size: 18px; font-weight: 800; }
+        .booking-held-alert p { margin: 5px 0 0; color: #dedcff; font-size: 11px; line-height: 1.55; }
+        .booking-held-alert-timer { position: relative; z-index: 1; margin-left: auto; min-width: 78px; padding: 9px 10px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 12px; color: #fff; background: rgba(15, 23, 42, .25); text-align: center; }
+        .booking-held-alert-timer strong { display: block; font-size: 19px; line-height: 1; letter-spacing: .04em; }
+        .booking-held-alert-timer span { display: block; margin-top: 5px; color: #c9c5ff; font-size: 8px; font-weight: 800; text-transform: uppercase; }
+        .booking-held-summary { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
+        .booking-held-summary div { padding: 10px 11px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 11px; background: rgba(255, 255, 255, .08); }
+        .booking-held-summary span, .booking-held-summary strong { display: block; }
+        .booking-held-summary span { color: #c9c5ff; font-size: 9px; font-weight: 700; }
+        .booking-held-summary strong { margin-top: 4px; color: #fff; font-size: 11px; }
+        @media (max-width: 575px) { .booking-held-alert-heading { flex-wrap: wrap; } .booking-held-alert-timer { margin-left: 55px; } }
+    </style>
+    @if ($booking->status === 'held')
+        <div class="booking-held-alert mb-4" role="alert">
+            <div class="booking-held-alert-heading">
+                <span class="booking-held-alert-icon"><i class="fas fa-lock"></i></span>
+                <div><small>{{ __('Booking berhasil ditahan') }}</small><h3>{{ __('Jadwal Anda sudah diamankan') }}</h3><p>{{ __('Jadwal ditahan selama :minutes menit. Selesaikan pembayaran sebelum waktu hold berakhir agar jadwal ini tetap menjadi milik Anda.', ['minutes' => $booking->businessService->businessPlace->hold_duration_minutes]) }}</p></div>
+                <div class="booking-held-alert-timer"><strong data-booking-alert-countdown>--:--</strong><span>{{ __('tersisa') }}</span></div>
+            </div>
+            <div class="booking-held-summary">
+                <div><span>{{ __('Kode booking') }}</span><strong>{{ $booking->booking_code }}</strong></div>
+                <div><span>{{ __('Tempat · layanan') }}</span><strong>{{ $booking->businessService->businessPlace->name }} · {{ $booking->businessService->name }}</strong></div>
+                <div><span>{{ __('Tanggal · jam') }}</span><strong>{{ $booking->booking_date->translatedFormat('d M Y') }} · {{ substr($booking->start_time, 0, 5) }}–{{ substr($booking->end_time, 0, 5) }}</strong></div>
+                <div><span>{{ __('Total estimasi') }}</span><strong>Rp {{ number_format((float) $booking->total_cost, 0, ',', '.') }}</strong></div>
+            </div>
+        </div>
+    @elseif (session('success'))
         <div class="alert alert-success small">{{ session('success') }}</div>
     @endif
     @if ($errors->any())
@@ -54,7 +86,7 @@
                     </form>
                     <p class="small text-muted text-center mt-2 mb-0">{{ __('Booking akan dikonfirmasi setelah penyedia memverifikasi bukti pembayaran.') }}</p>
                     @if ($extensionOptions)
-                        <div class="booking-extension-card mt-4"><div><strong><i class="fas fa-clock-rotate-left me-2"></i>{{ __('Tambah jam booking') }}</strong><small>{{ __('Perpanjang waktu sampai sebelum jam operasional berakhir.') }}</small></div><form method="POST" action="{{ route('bookings.extend', $booking) }}" class="row g-2 align-items-end mt-2">@csrf @method('PATCH')<div class="col-7"><label class="form-label small mb-1" for="additional_hours">{{ __('Tambahan durasi') }}</label><select id="additional_hours" name="additional_hours" class="form-select">@foreach ($extensionOptions as $option)<option value="{{ $option['hours'] }}">+{{ $option['hours'] }} {{ __('jam') }} ({{ $option['end_time'] }})</option>@endforeach</select></div><div class="col-5"><button class="btn btn-outline-primary w-100"><i class="fas fa-plus me-1"></i>{{ __('Tambah jam') }}</button></div></form></div>
+                        <div class="booking-extension-card mt-4"><div><strong><i class="fas fa-clock-rotate-left me-2"></i>{{ __('Tambah jam booking') }}</strong><small>{{ __('Pilihan hanya sampai jam yang masih kosong, sebelum booking berikutnya.') }}</small></div><form method="POST" action="{{ route('bookings.extend', $booking) }}" class="row g-2 align-items-end mt-2">@csrf @method('PATCH')<div class="col-7"><label class="form-label small mb-1" for="additional_hours">{{ __('Tambahan durasi') }}</label><select id="additional_hours" name="additional_hours" class="form-select">@foreach ($extensionOptions as $option)<option value="{{ $option['hours'] }}">+{{ $option['hours'] }} {{ __('jam') }} ({{ $option['end_time'] }})</option>@endforeach</select></div><div class="col-5"><button class="btn btn-outline-primary w-100"><i class="fas fa-plus me-1"></i>{{ __('Tambah jam') }}</button></div></form></div>
                     @endif
                     <form method="POST" action="{{ route('bookings.cancel', $booking) }}" class="mt-3" data-confirm="{{ __('Batalkan booking ini? Jadwal akan tersedia kembali.') }}">@csrf @method('DELETE')<button class="btn btn-outline-danger w-100"><i class="fas fa-ban me-2"></i>{{ __('Batalkan booking') }}</button></form>
                 @elseif ($booking->status === 'payment_submitted')
@@ -89,12 +121,14 @@
     @if ($booking->status === 'held')
         <script>
             const countdown = document.getElementById('booking-countdown');
+            const alertCountdown = document.querySelector('[data-booking-alert-countdown]');
             const expiresAt = new Date(countdown.dataset.expires).getTime();
             const updateCountdown = () => {
                 const remaining = Math.max(0, expiresAt - Date.now());
                 const minutes = Math.floor(remaining / 60000).toString().padStart(2, '0');
                 const seconds = Math.floor((remaining % 60000) / 1000).toString().padStart(2, '0');
                 countdown.textContent = `{{ __('Sisa waktu') }} ${minutes}:${seconds}`;
+                if (alertCountdown) { alertCountdown.textContent = `${minutes}:${seconds}`; }
                 if (remaining === 0) { window.location.reload(); }
             };
             updateCountdown();

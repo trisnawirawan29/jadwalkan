@@ -5,7 +5,10 @@
 @section('content')
     <div class="content-card business-service-list-card">
         @if (session('success'))<div class="alert alert-success small">{{ session('success') }}</div>@endif
-        <div class="card-heading"><div><h5>Layanan dan lapangan</h5><p>Tambahkan fasilitas yang tersedia di tempat ini.</p></div><div class="d-flex gap-2"><a href="{{ route('provider.business-places.index') }}" class="btn btn-light">Kembali</a><a href="{{ route('provider.business-places.services.create', $businessPlace) }}" class="btn btn-primary"><i class="fas fa-plus me-1"></i>Tambah layanan</a></div></div>
+        @if (session('warning') || $serviceLimitMessage)
+            <div class="plan-limit-warning"><span class="plan-limit-warning-icon"><i class="fas fa-layer-group"></i></span><div><strong>{{ __('Batas layanan paket') }}</strong><p>{{ session('warning', $serviceLimitMessage) }}</p></div><a href="{{ route('provider.plans.index') }}" class="btn btn-warning btn-sm ms-auto"><i class="fas fa-arrow-up me-1"></i>{{ __('Upgrade paket') }}</a></div>
+        @endif
+        <div class="card-heading"><div><h5>Layanan dan lapangan</h5><p>Tambahkan fasilitas yang tersedia di tempat ini.</p></div><div class="d-flex gap-2"><a href="{{ route('provider.business-places.index') }}" class="btn btn-light">Kembali</a><a href="{{ route('provider.business-places.services.create', $businessPlace) }}" class="btn btn-primary {{ $serviceLimitMessage ? 'disabled' : '' }}" @if ($serviceLimitMessage) aria-disabled="true" @endif><i class="fas fa-plus me-1"></i>Tambah layanan</a></div></div>
         <div class="table-responsive"><table class="table align-middle"><thead><tr><th>LAYANAN</th><th>JENIS LAYANAN</th><th>RINGKASAN JADWAL</th><th>STATUS</th><th>AKSI</th></tr></thead><tbody>
             @forelse ($businessPlace->services as $businessService)
                 @php

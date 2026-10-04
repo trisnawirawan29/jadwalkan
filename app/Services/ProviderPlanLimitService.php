@@ -36,13 +36,27 @@ class ProviderPlanLimitService
 
     public function ensureCanCreateService(BusinessPlace $businessPlace): void
     {
+        if ($message = $this->serviceCreationLimitMessage($businessPlace)) {
+            throw ValidationException::withMessages(['name' => $message]);
+        }
+    }
+
+    public function serviceCreationLimitMessage(BusinessPlace $businessPlace): ?string
+    {
         $provider = $businessPlace->provider;
-        $this->ensurePlanIsActive($provider);
         $plan = $provider?->providerPlan;
 
-        if ($plan && $businessPlace->services()->count() >= $plan->max_services_per_place) {
-            throw ValidationException::withMessages(['name' => "Paket {$plan->name} membatasi hingga {$plan->max_services_per_place} layanan per bisnis."]);
+        if ($plan && $provider->provider_plan_expires_at?->isPast()) {
+            $this->deactivateExpiredBusinesses($provider);
+
+            return "Masa aktif paket {$plan->name} telah berakhir. Upgrade paket untuk menambahkan atau mengaktifkan layanan kembali.";
         }
+
+        if ($plan && $businessPlace->services()->count() >= $plan->max_services_per_place) {
+            return "Paket {$plan->name} membatasi hingga {$plan->max_services_per_place} layanan per bisnis. Kuota layanan di tempat ini sudah penuh. Silakan upgrade paket untuk menambahkan layanan baru.";
+        }
+
+        return null;
     }
 
     public function ensureCanAcceptBooking(BusinessPlace $businessPlace, Carbon $bookingDate): void

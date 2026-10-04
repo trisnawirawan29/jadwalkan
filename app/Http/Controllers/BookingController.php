@@ -354,10 +354,29 @@ class BookingController extends Controller
 
         $currentEnd = Carbon::parse($booking->end_time);
         $scheduleEnd = Carbon::parse($booking->serviceSchedule->end_time);
+        $blockedBookings = Booking::query()
+            ->where('id', '<>', $booking->id)
+            ->where('business_service_id', $booking->business_service_id)
+            ->whereDate('booking_date', $booking->booking_date)
+            ->whereIn('status', ['held', 'payment_submitted', 'rejected', 'confirmed'])
+            ->where(static function (Builder $query): void {
+                $query->where('status', '!=', 'held')->orWhere('expires_at', '>', now());
+            })
+            ->get(['start_time', 'end_time']);
         $options = [];
 
         for ($hours = 1; $currentEnd->copy()->addHours($hours)->lte($scheduleEnd); $hours++) {
-            $options[] = ['hours' => $hours, 'end_time' => $currentEnd->copy()->addHours($hours)->format('H:i')];
+            $newEnd = $currentEnd->copy()->addHours($hours);
+            $overlapsBooking = $blockedBookings->contains(static function (Booking $blockedBooking) use ($currentEnd, $newEnd): bool {
+                return Carbon::parse($blockedBooking->start_time)->lt($newEnd)
+                    && Carbon::parse($blockedBooking->end_time)->gt($currentEnd);
+            });
+
+            if ($overlapsBooking) {
+                break;
+            }
+
+            $options[] = ['hours' => $hours, 'end_time' => $newEnd->format('H:i')];
         }
 
         return $options;

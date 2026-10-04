@@ -70,6 +70,50 @@ class BookingTest extends TestCase
         $this->assertTrue(Booking::latest('id')->firstOrFail()->expires_at->between(now()->addMinutes(24), now()->addMinutes(26)));
     }
 
+    public function test_held_booking_detail_shows_an_attractive_booking_summary_alert(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $provider = User::factory()->create(['role' => 'provider']);
+        $place = BusinessPlace::factory()->create(['provider_id' => $provider->id, 'hold_duration_minutes' => 20]);
+        $service = BusinessService::factory()->create(['business_place_id' => $place->id, 'name' => 'Lapangan Utama']);
+        $schedule = ServiceSchedule::factory()->create(['business_service_id' => $service->id]);
+        $booking = Booking::factory()->create([
+            'user_id' => $user->id,
+            'business_service_id' => $service->id,
+            'service_schedule_id' => $schedule->id,
+            'booking_code' => 'BK-ALERT-2020',
+            'total_cost' => 250000,
+            'status' => 'held',
+            'expires_at' => now()->addMinutes(20),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('bookings.show', $booking))
+            ->assertOk()
+            ->assertSee('booking-held-alert', false)
+            ->assertSee('Booking berhasil ditahan')
+            ->assertSee('BK-ALERT-2020')
+            ->assertSee('Lapangan Utama')
+            ->assertSee('250.000');
+    }
+
+    public function test_landing_booking_form_includes_a_confirmation_alert_before_holding_schedule(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $provider = User::factory()->create(['role' => 'provider']);
+        $place = BusinessPlace::factory()->create(['provider_id' => $provider->id, 'hold_duration_minutes' => 10]);
+        $service = BusinessService::factory()->create(['business_place_id' => $place->id]);
+        ServiceSchedule::factory()->create(['business_service_id' => $service->id]);
+
+        $this->actingAs($user)
+            ->get(route('places.show', $place))
+            ->assertOk()
+            ->assertSee('booking-confirmation-modal', false)
+            ->assertSee('Tahan jadwal ini?')
+            ->assertSee('Konfirmasi tahan jadwal')
+            ->assertSee('selama 10 menit');
+    }
+
     public function test_superadmin_can_hold_a_matching_schedule_for_ten_minutes(): void
     {
         $superadmin = User::factory()->create(['role' => 'superadmin']);
@@ -274,6 +318,81 @@ class BookingTest extends TestCase
         $booking->refresh();
         $this->assertSame('11:00:00', $booking->end_time);
         $this->assertSame('300000.00', (string) $booking->total_cost);
+    }
+
+    public function test_extension_options_stop_before_the_next_booking(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $provider = User::factory()->create(['role' => 'provider']);
+        $place = BusinessPlace::factory()->create(['provider_id' => $provider->id]);
+        $service = BusinessService::factory()->create(['business_place_id' => $place->id]);
+        $schedule = ServiceSchedule::factory()->create([
+            'business_service_id' => $service->id,
+            'start_time' => '08:00',
+            'end_time' => '13:00',
+        ]);
+        $booking = Booking::factory()->create([
+            'user_id' => $user->id,
+            'business_service_id' => $service->id,
+            'service_schedule_id' => $schedule->id,
+            'start_time' => '08:00',
+            'end_time' => '09:00',
+            'status' => 'held',
+            'expires_at' => now()->addMinutes(10),
+        ]);
+        Booking::factory()->create([
+            'business_service_id' => $service->id,
+            'service_schedule_id' => $schedule->id,
+            'booking_date' => $booking->booking_date,
+            'start_time' => '10:00',
+            'end_time' => '11:00',
+            'status' => 'confirmed',
+            'expires_at' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('bookings.show', $booking))
+            ->assertOk()
+            ->assertSee('value="1"', false)
+            ->assertDontSee('value="2"', false);
+    }
+
+    public function test_customer_cannot_extend_a_booking_into_a_next_booking(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $provider = User::factory()->create(['role' => 'provider']);
+        $place = BusinessPlace::factory()->create(['provider_id' => $provider->id]);
+        $service = BusinessService::factory()->create(['business_place_id' => $place->id]);
+        $schedule = ServiceSchedule::factory()->create([
+            'business_service_id' => $service->id,
+            'start_time' => '08:00',
+            'end_time' => '13:00',
+        ]);
+        $booking = Booking::factory()->create([
+            'user_id' => $user->id,
+            'business_service_id' => $service->id,
+            'service_schedule_id' => $schedule->id,
+            'start_time' => '08:00',
+            'end_time' => '09:00',
+            'status' => 'held',
+            'expires_at' => now()->addMinutes(10),
+        ]);
+        Booking::factory()->create([
+            'business_service_id' => $service->id,
+            'service_schedule_id' => $schedule->id,
+            'booking_date' => $booking->booking_date,
+            'start_time' => '10:00',
+            'end_time' => '11:00',
+            'status' => 'confirmed',
+            'expires_at' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('bookings.extend', $booking), ['additional_hours' => 2])
+            ->assertRedirect()
+            ->assertSessionHasErrors('additional_hours');
+
+        $this->assertDatabaseHas('bookings', ['id' => $booking->id, 'end_time' => '09:00']);
     }
 
     public function test_customer_can_cancel_a_rejected_booking(): void

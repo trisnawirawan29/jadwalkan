@@ -29,6 +29,8 @@
                         @endauth
                         <a href="{{ route('places.index') }}" class="landing-secondary-button"><i class="fa-solid fa-compass"></i><span>{{ __('Jelajahi tempat') }}</span></a>
                     </div>
+                    <button type="button" data-nearby-trigger class="landing-location-button mt-4"><i class="fa-solid fa-location-crosshairs"></i><span>{{ __('Cari venue yang masih tersedia hari ini') }}</span></button>
+                    <p data-nearby-status class="mt-3 max-w-xl text-xs leading-5 text-slate-500" aria-live="polite">{{ __('Izinkan akses lokasi untuk melihat venue yang sedang kosong dan paling dekat dengan Anda.') }}</p>
                     <div class="mt-5 flex flex-wrap gap-2 text-xs font-semibold"><span class="landing-audience-pill"><i class="fa-solid fa-calendar-check"></i>{{ __('Untuk booking') }}</span><span class="landing-audience-pill"><i class="fa-solid fa-store"></i>{{ __('Untuk pemilik bisnis') }}</span></div>
                     <div class="mt-12 flex items-center gap-4 text-sm text-slate-400"><div class="flex -space-x-2"><span class="landing-avatar bg-orange-300">A</span><span class="landing-avatar bg-cyan-300">B</span><span class="landing-avatar bg-violet-300">C</span></div><span>{{ __('Tempat baru terus bertambah setiap hari') }}</span></div>
                 </div>
@@ -87,6 +89,16 @@
             <div class="landing-map-section"><div class="max-w-md"><p class="landing-eyebrow">{{ __('Jangkauan lokasi') }}</p><h2 class="landing-section-title">{{ __('Lihat sebaran tempat dalam satu peta.') }}</h2><p class="mt-4 leading-7 text-slate-400">{{ __('Gunakan peta interaktif untuk menemukan tempat terdekat dan buka petunjuk arah menuju lokasi pilihan Anda.') }}</p><div class="mt-7 flex items-center gap-3 text-sm text-slate-300"><span class="landing-check"><i class="fa-solid fa-check"></i></span>{{ __('Data lokasi diperbarui oleh pemilik bisnis') }}</div></div><div id="landing-map" class="landing-leaflet-map" data-empty="{{ __('Belum ada lokasi dengan koordinat.') }}"></div></div>
         </section>
 
+        <section id="terdekat" class="landing-section mx-auto max-w-7xl px-5 lg:px-8" data-nearby-section hidden>
+            <div class="landing-nearby-panel">
+                <div class="flex flex-wrap items-end justify-between gap-5">
+                    <div><p class="landing-eyebrow">{{ __('Ketersediaan hari ini') }}</p><h2 class="landing-section-title">{{ __('Venue yang masih tersedia hari ini di dekat Anda') }}</h2><p data-nearby-checked-at class="mt-3 text-sm text-slate-400"></p></div>
+                    <button type="button" data-nearby-refresh class="landing-secondary-button"><i class="fa-solid fa-arrows-rotate"></i>{{ __('Perbarui lokasi') }}</button>
+                </div>
+                <div data-nearby-results class="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3"></div>
+            </div>
+        </section>
+
         <section id="jelajahi" class="landing-section mx-auto max-w-7xl px-5 lg:px-8">
             <div class="flex flex-wrap items-end justify-between gap-5"><div><p class="landing-eyebrow">{{ __('Pilihan terbaru') }}</p><h2 class="landing-section-title">{{ __('Tempat yang siap Anda kunjungi') }}</h2></div><span class="landing-result-count">{{ $activePlaces->count() }} {{ __('tempat aktif') }}</span></div>
             <div id="landing-places-grid" class="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -106,6 +118,53 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const mapPlaces = {{ Illuminate\Support\Js::from($mapPlaces) }};
+        const nearbyEndpoint = @js(route('nearby-available-places'));
+        const nearbySection = document.querySelector('[data-nearby-section]');
+        const nearbyResults = document.querySelector('[data-nearby-results]');
+        const nearbyStatus = document.querySelector('[data-nearby-status]');
+        const nearbyCheckedAt = document.querySelector('[data-nearby-checked-at]');
+        const nearbyTrigger = document.querySelector('[data-nearby-trigger]');
+        const nearbyRefresh = document.querySelector('[data-nearby-refresh]');
+        const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);
+        const nearbyEmptyMessage = @js(__('Tidak ada venue kosong yang terdeteksi di sekitar lokasi Anda saat ini.'));
+        const nearbyErrorMessage = @js(__('Lokasi belum dapat diakses. Periksa izin lokasi browser Anda lalu coba lagi.'));
+        const nearbyLoadingMessage = @js(__('Mencari venue kosong terdekat...'));
+        const nearbyDistanceLabel = @js(__('km dari Anda'));
+        const nearbyBookLabel = @js(__('Lihat venue'));
+        const nearbyServicesLabel = @js(__('layanan masih tersedia hari ini'));
+        let currentCoordinates = null;
+
+        const renderNearbyResults = places => {
+            nearbyResults.innerHTML = places.length ? places.map(place => `<article class="landing-nearby-card"><div class="flex items-start justify-between gap-3"><div><span class="landing-nearby-badge"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(@js(__('Masih tersedia hari ini')))}</span><h3 class="mt-3 text-lg font-bold text-white">${escapeHtml(place.name)}</h3></div><span class="landing-nearby-distance"><i class="fa-solid fa-location-arrow"></i> ${escapeHtml(place.distance)} ${escapeHtml(nearbyDistanceLabel)}</span></div><p class="mt-3 line-clamp-2 text-sm leading-6 text-slate-400"><i class="fa-solid fa-location-dot mr-1 text-indigo-300"></i>${escapeHtml(place.address || @js(__('Alamat belum tersedia')))}</p><p class="mt-3 text-xs font-semibold text-emerald-300"><i class="fa-solid fa-bolt mr-1"></i>${escapeHtml(place.services.join(', '))} — ${escapeHtml(nearbyServicesLabel)}</p><div class="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">${place.mapsUrl ? `<a href="${escapeHtml(place.mapsUrl)}" target="_blank" rel="noopener" class="landing-card-link">${escapeHtml(@js(__('Petunjuk arah')))} <i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ''}<a href="${escapeHtml(place.url)}" class="landing-book-now">${escapeHtml(nearbyBookLabel)} <i class="fa-solid fa-arrow-right"></i></a></div></article>`).join('') : `<div class="landing-empty md:col-span-2 lg:col-span-3">${escapeHtml(nearbyEmptyMessage)}</div>`;
+        };
+
+        const loadNearbyPlaces = () => {
+            if (! currentCoordinates) return;
+            nearbyStatus.textContent = nearbyLoadingMessage;
+            nearbyResults.innerHTML = '';
+            nearbySection.hidden = false;
+            fetch(`${nearbyEndpoint}?latitude=${encodeURIComponent(currentCoordinates.latitude)}&longitude=${encodeURIComponent(currentCoordinates.longitude)}`, { headers: { Accept: 'application/json' } })
+                .then(response => { if (! response.ok) throw new Error('nearby-request-failed'); return response.json(); })
+                .then(data => {
+                    renderNearbyResults(data.places);
+                    nearbyCheckedAt.textContent = `${@js(__('Diperbarui'))} ${new Date(data.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                    nearbyStatus.textContent = @js(__('Lokasi Anda berhasil digunakan untuk mengurutkan venue terdekat.'));
+                    nearbySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                })
+                .catch(() => { nearbyStatus.textContent = nearbyErrorMessage; nearbyResults.innerHTML = `<div class="landing-empty md:col-span-2 lg:col-span-3">${escapeHtml(nearbyErrorMessage)}</div>`; });
+        };
+
+        const requestNearbyPlaces = () => {
+            if (! navigator.geolocation) { nearbyStatus.textContent = nearbyErrorMessage; return; }
+            nearbyStatus.textContent = nearbyLoadingMessage;
+            navigator.geolocation.getCurrentPosition(position => {
+                currentCoordinates = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+                loadNearbyPlaces();
+            }, () => { nearbyStatus.textContent = nearbyErrorMessage; }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+        };
+        nearbyTrigger?.addEventListener('click', requestNearbyPlaces);
+        nearbyRefresh?.addEventListener('click', requestNearbyPlaces);
+
         const mapElement = document.getElementById('landing-map');
         if (mapElement && window.L) {
             const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);

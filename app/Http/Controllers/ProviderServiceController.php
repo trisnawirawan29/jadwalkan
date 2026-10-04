@@ -14,7 +14,7 @@ use Illuminate\View\View;
 
 class ProviderServiceController extends Controller
 {
-    public function index(BusinessPlace $businessPlace): View
+    public function index(BusinessPlace $businessPlace, ProviderPlanLimitService $planLimits): View
     {
         $this->authorize('view', $businessPlace);
         $businessPlace->load(['services' => function ($query): void {
@@ -27,13 +27,22 @@ class ProviderServiceController extends Controller
                 ->latest();
         }]);
 
-        return view('provider.services.index', compact('businessPlace'));
+        return view('provider.services.index', [
+            'businessPlace' => $businessPlace,
+            'serviceLimitMessage' => $planLimits->serviceCreationLimitMessage($businessPlace),
+        ]);
     }
 
-    public function create(BusinessPlace $businessPlace): View
+    public function create(BusinessPlace $businessPlace, ProviderPlanLimitService $planLimits): View|RedirectResponse
     {
         $this->authorize('view', $businessPlace);
         $this->authorize('create', BusinessService::class);
+
+        if ($message = $planLimits->serviceCreationLimitMessage($businessPlace)) {
+            return redirect()->route('provider.business-places.services.index', $businessPlace)
+                ->with('warning', $message)
+                ->with('show_plan_upgrade', true);
+        }
 
         return view('provider.services.form', ['businessPlace' => $businessPlace, 'businessService' => new BusinessService, 'categories' => $this->categories()]);
     }

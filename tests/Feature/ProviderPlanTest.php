@@ -93,6 +93,21 @@ class ProviderPlanTest extends TestCase
             ->assertSessionHas('show_plan_upgrade', true);
     }
 
+    public function test_provider_is_redirected_with_service_limit_warning_when_clicking_add_service_at_limit(): void
+    {
+        $provider = User::factory()->create(['role' => 'provider']);
+        $plan = ProviderPlan::factory()->create(['name' => 'Starter', 'max_services_per_place' => 1]);
+        $provider->update(['provider_plan_id' => $plan->id, 'provider_plan_expires_at' => now()->addMonth()]);
+        $place = BusinessPlace::factory()->create(['provider_id' => $provider->id]);
+        BusinessService::factory()->create(['business_place_id' => $place->id]);
+
+        $this->actingAs($provider)
+            ->get(route('provider.business-places.services.create', $place))
+            ->assertRedirect(route('provider.business-places.services.index', $place))
+            ->assertSessionHas('warning', 'Paket Starter membatasi hingga 1 layanan per bisnis. Kuota layanan di tempat ini sudah penuh. Silakan upgrade paket untuk menambahkan layanan baru.')
+            ->assertSessionHas('show_plan_upgrade', true);
+    }
+
     public function test_provider_staff_cannot_manage_provider_plans(): void
     {
         $staff = User::factory()->create(['role' => 'provider_staff']);
