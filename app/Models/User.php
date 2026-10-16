@@ -10,12 +10,13 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['name', 'email', 'password', 'avatar', 'role', 'provider_id', 'provider_plan_id', 'provider_plan_started_at', 'provider_plan_expires_at', 'job_title', 'phone', 'location', 'province_code', 'province_name', 'regency_code', 'regency_name', 'district_code', 'district_name', 'birth_date', 'website', 'bio', 'payment_bank_name', 'payment_bank_account_name', 'payment_bank_account_number', 'payment_qris_image', 'google_id'])]
+#[Fillable(['name', 'email', 'password', 'avatar', 'role', 'provider_id', 'provider_plan_id', 'provider_plan_started_at', 'provider_plan_expires_at', 'job_title', 'phone', 'location', 'province_code', 'province_name', 'regency_code', 'regency_name', 'district_code', 'district_name', 'latitude', 'longitude', 'birth_date', 'website', 'bio', 'payment_bank_name', 'payment_bank_account_name', 'payment_bank_account_number', 'payment_qris_image', 'google_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements CanResetPassword
 {
@@ -87,6 +88,26 @@ class User extends Authenticatable implements CanResetPassword
         return $this->hasMany(Booking::class);
     }
 
+    public function sportInterests(): BelongsToMany
+    {
+        return $this->belongsToMany(BusinessCategory::class, 'user_sport_interest')->withTimestamps();
+    }
+
+    public function sportCommunities(): BelongsToMany
+    {
+        return $this->belongsToMany(SportCommunity::class, 'community_user')->withPivot('status')->withTimestamps();
+    }
+
+    public function sportGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(SportGroup::class, 'sport_group_user')->withPivot(['status', 'responded_at'])->withTimestamps();
+    }
+
+    public function sportPreferences(): HasMany
+    {
+        return $this->hasMany(SportPreference::class);
+    }
+
     public function getAvatarUrlAttribute(): ?string
     {
         if (! $this->avatar || ! Storage::disk('public')->exists($this->avatar)) {
@@ -119,6 +140,8 @@ class User extends Authenticatable implements CanResetPassword
             'provider_plan_id' => 'integer',
             'provider_plan_started_at' => 'datetime',
             'provider_plan_expires_at' => 'datetime',
+            'latitude' => 'float',
+            'longitude' => 'float',
         ];
     }
 }

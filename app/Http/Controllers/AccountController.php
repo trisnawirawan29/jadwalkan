@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreSportPreferenceRequest;
+use App\Models\BusinessCategory;
 use App\Models\ProviderPaymentMethod;
+use App\Models\SportPreference;
 use App\Support\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,8 +41,35 @@ class AccountController extends Controller
     public function profile(): View
     {
         $sessions = DB::table('sessions')->where('user_id', auth()->id())->orderByDesc('last_activity')->get();
+        $sports = BusinessCategory::query()->where('is_active', true)->whereNotNull('parent_id')->orderBy('sort_order')->orderBy('name')->get();
+        $sportPreferences = auth()->user()->sportPreferences()->with('businessCategory')->orderBy('day_of_week')->orderBy('start_time')->get();
 
-        return view('account.profile', compact('sessions'));
+        return view('account.profile', compact('sessions', 'sports', 'sportPreferences'));
+    }
+
+    public function storeSportPreference(StoreSportPreferenceRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+        $request->user()->sportPreferences()->updateOrCreate(
+            [
+                'business_category_id' => $data['business_category_id'],
+                'day_of_week' => $data['day_of_week'],
+                'start_time' => $data['start_time'],
+                'end_time' => $data['end_time'],
+            ],
+            ['level' => $data['level']],
+        );
+        $request->user()->sportInterests()->syncWithoutDetaching([$data['business_category_id']]);
+
+        return back()->with('success', 'Ketertarikan olahraga dan jadwal berhasil disimpan.');
+    }
+
+    public function destroySportPreference(Request $request, SportPreference $sportPreference): RedirectResponse
+    {
+        abort_unless($sportPreference->user_id === $request->user()->id, 403);
+        $sportPreference->delete();
+
+        return back()->with('success', 'Jadwal olahraga berhasil dihapus dari agenda.');
     }
 
     public function payment(): View
@@ -126,6 +156,7 @@ class AccountController extends Controller
             'province_code' => ['nullable', 'string', 'max:10'], 'province_name' => ['nullable', 'string', 'max:100'],
             'regency_code' => ['nullable', 'string', 'max:15'], 'regency_name' => ['nullable', 'string', 'max:100'],
             'district_code' => ['nullable', 'string', 'max:20'], 'district_name' => ['nullable', 'string', 'max:100'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'], 'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'website' => ['nullable', 'url', 'max:255'], 'bio' => ['nullable', 'string', 'max:1000'],
             ...$this->paymentRules(),
         ]);

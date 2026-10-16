@@ -25,5 +25,7 @@ class DatabaseSeeder extends Seeder
 
         $admin->notify(new SystemNotification('Selamat datang di NexaAdmin', 'Akun admin Anda siap digunakan.', 'success'));
         $admin->notify(new SystemNotification('Lengkapi profil Anda', 'Tambahkan avatar dan informasi pribadi agar profil lebih lengkap.', 'info'));
+
+        $this->call(SportGroupDemoSeeder::class);
     }
 }

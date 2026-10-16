@@ -92,6 +92,9 @@
                     <li class="nav-item"><a href="{{ route('provider-application.create') }}" class="nav-link {{ request()->routeIs('provider-application.*') ? 'active' : '' }}"><i class="nav-icon fas fa-store-alt"></i><p>Pengajuan provider</p></a></li>
                 @endif
                 <li class="nav-item"><a href="{{ route('bookings.index') }}" class="nav-link {{ request()->routeIs('bookings.*') ? 'active' : '' }}"><i class="nav-icon fas fa-calendar-check"></i><p>{{ __('Booking saya') }}@if($providerNotificationUnread > 0)<span class="sidebar-notification-badge">{{ $providerNotificationUnread > 9 ? '9+' : $providerNotificationUnread }}</span>@endif</p></a></li>
+                @if (auth()->user()->hasRole('user'))
+                    <li class="nav-item"><a href="{{ route('sport-groups.index') }}" class="nav-link {{ request()->routeIs('sport-groups.*') ? 'active' : '' }}"><i class="nav-icon fas fa-people-arrows"></i><p>Kelompok olahraga</p></a></li>
+                @endif
             </ul>
             <div class="nav-header mt-3">{{ __('MY ACCOUNT') }}</div>
             <ul class="nav sidebar-menu flex-column" role="menu">

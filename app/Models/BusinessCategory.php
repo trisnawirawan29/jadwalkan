@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['parent_id', 'name', 'slug', 'is_active', 'sort_order'])]
 class BusinessCategory extends Model
@@ -37,5 +38,20 @@ class BusinessCategory extends Model
     public function places(): BelongsToMany
     {
         return $this->belongsToMany(BusinessPlace::class, 'business_place_business_category')->withTimestamps();
+    }
+
+    public function sportCommunity(): HasOne
+    {
+        return $this->hasOne(SportCommunity::class);
+    }
+
+    public function interestedUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'user_sport_interest')->withTimestamps();
+    }
+
+    public function sportPreferences(): HasMany
+    {
+        return $this->hasMany(SportPreference::class);
     }
 }
